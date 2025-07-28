@@ -3,6 +3,7 @@
 #include "CommandProcessor.hpp"
 #include "GenerateCentroidsCartridge.hpp"
 
+
 int main() {
     CommandProcessor processor;
     

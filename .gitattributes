@@ -1,0 +1,8 @@
+# テキストファイルを自動で判別し、リポジトリ内ではLFで統一する
+* text=auto eol=lf
+
+# Windowsのバッチファイルなど、CRLFが必須のファイルは個別に指定
+*.{cmd,bat} text eol=crlf
+
+# 画像などのバイナリファイルが誤変換されるのを防ぐ
+*.{png,jpg,gif,pdf} binary

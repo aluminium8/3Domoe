@@ -4,6 +4,7 @@
 #include <rfl.hpp>
 #include <vector>
 
+
 class GenerateCentroidsCartridge {
 public:
     // 1. 入力用の構造体を定義

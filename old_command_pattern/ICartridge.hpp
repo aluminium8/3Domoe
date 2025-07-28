@@ -4,6 +4,7 @@
 #include <string>
 #include <variant>
 
+
 // 全てのカートリッジが満たすべき規約(コンセプト)
 template<typename T>
 concept Cartridge = requires(T cartridge, const typename T::Input& input) {

@@ -48,3 +48,4 @@ link_directories(${VCPKG_LIB_DIR})
 
 add_executable(main ./old_command_pattern/main.cpp)
 target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp)
+

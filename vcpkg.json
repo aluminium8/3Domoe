@@ -1,0 +1,15 @@
+{
+  "name": "yoroshiku-viewer",
+  "version": "1.0.0",
+  "dependencies": [
+    "spdlog",
+
+    {
+      "name": "reflectcpp",
+      "features": [
+        "toml"
+      ]
+    }
+
+  ]
+}

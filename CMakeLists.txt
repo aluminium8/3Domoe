@@ -46,5 +46,5 @@ find_package(reflectcpp CONFIG REQUIRED)
 set(VCPKG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/vcpkg_installed/x64-windows/lib")
 link_directories(${VCPKG_LIB_DIR})
 
-add_executable(main ./main.cpp)
+add_executable(main ./old_command_pattern/main.cpp)
 target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp)

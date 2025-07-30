@@ -55,8 +55,26 @@ add_subdirectory(external/rfl_eigen_serdes EXCLUDE_FROM_ALL)
 #endforeach()
 
 
-add_executable(main ./old_command_pattern/main.cpp)
-target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
 
-add_executable(eigen_sd ./old_command_pattern/serial_deserial_test_eigen3.cpp)
-target_link_libraries(eigen_sd PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)
+add_library(ResultRepository source/ResultRepository.cpp)
+target_link_libraries(ResultRepository PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
+target_include_directories(ResultRepository PRIVATE include)
+
+add_library(CommandProcessor source/CommandProcessor.cpp)
+target_link_libraries(CommandProcessor PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository )
+target_include_directories(CommandProcessor PRIVATE include)
+
+add_executable(main ./sample/main.cpp)
+target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor )
+target_include_directories(main PRIVATE include)
+
+
+
+
+
+#TODO old files must be deleted
+add_executable(old_main ./old_command_pattern/main.cpp)
+target_link_libraries(old_main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
+
+add_executable(old_eigen_sd ./old_command_pattern/serial_deserial_test_eigen3.cpp)
+target_link_libraries(old_eigen_sd PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)

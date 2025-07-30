@@ -6,7 +6,7 @@
 // インクルードパスを新しい構成に合わせる
 #include <MITSUDomoe/CommandProcessor.hpp>
 #include <MITSUDomoe/ResultRepository.hpp>
-#include "GenerateCentroidsCartridge.hpp"
+#include "GenerateCentroidsCartridge_mock.hpp"
 #include "BIGprocess_mock_cartridge.hpp"
 
 // (関数の中身は前回と同じ)
@@ -19,7 +19,7 @@ void print_result(uint64_t id, const std::optional<CommandResult>& result) {
     if (const auto* success = std::get_if<SuccessResult>(&(*result))) {
         std::cout << "  Task " << id << " Succeeded!" << std::endl;
         std::cout << "  Raw Output TOML:\n" << success->output_toml << std::endl;
-        auto output = rfl::toml::read<GenerateCentroidsCartridge::Output>(
+        auto output = rfl::toml::read<GenerateCentroidsCartridge_mock::Output>(
             success->output_toml);
         if (output) {
             std::cout << "  Deserialized Message: " << output->message << std::endl;
@@ -36,7 +36,7 @@ int main() {
     // (中身は前回と同じ)
     auto result_repo = std::make_shared<ResultRepository>();
     CommandProcessor processor(result_repo);
-    processor.register_cartridge("generateCentroids", GenerateCentroidsCartridge{});
+    processor.register_cartridge("generateCentroids", GenerateCentroidsCartridge_mock{});
     processor.register_cartridge("BIGprocess_mock_cartridge",BIGprocess_mock_cartridge{});
 
     const std::string command_name = "generateCentroids";

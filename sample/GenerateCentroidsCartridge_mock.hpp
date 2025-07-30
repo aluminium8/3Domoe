@@ -5,7 +5,7 @@
 #include <vector>
 
 
-class GenerateCentroidsCartridge {
+class GenerateCentroidsCartridge_mock {
 public:
     // 1. 入力用の構造体を定義
     struct Input {
@@ -37,4 +37,4 @@ public:
 };
 
 // コンセプトを満たしていることをコンパイラにチェックさせる (任意)
-static_assert(Cartridge<GenerateCentroidsCartridge>);
+static_assert(Cartridge<GenerateCentroidsCartridge_mock>);

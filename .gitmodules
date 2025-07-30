@@ -1,0 +1,4 @@
+[submodule "external/rfl_eigen_serdes"]
+	path = external/rfl_eigen_serdes
+	url = https://github.com/aluminium8/rfl_eigen_serdes.git
+	branch = main

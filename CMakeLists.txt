@@ -33,6 +33,16 @@ find_package(spdlog REQUIRED)
 
 
 find_package(reflectcpp CONFIG REQUIRED)
+find_package(Eigen3  CONFIG REQUIRED)
+
+
+# サブモジュールを追加 (テストとサンプルは不要なのでOFFにする)
+# add_subdirectory を呼び出す前に、サブディレクトリのオプションを設定
+set(BUILD_TESTS OFF CACHE BOOL "Disable tests for rfl_eigen_serdes" FORCE)
+set(BUILD_SAMPLE OFF CACHE BOOL "Disable sample for rfl_eigen_serdes" FORCE)
+
+add_subdirectory(external/rfl_eigen_serdes EXCLUDE_FROM_ALL)
+
 
 # PkgConfigモジュールのインクルード
 
@@ -43,9 +53,10 @@ find_package(reflectcpp CONFIG REQUIRED)
 #foreach (_variableName ${_variableNames})
 #    message(STATUS "${_variableName}=${${_variableName}}")
 #endforeach()
-set(VCPKG_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/vcpkg_installed/x64-windows/lib")
-link_directories(${VCPKG_LIB_DIR})
+
 
 add_executable(main ./old_command_pattern/main.cpp)
-target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp)
+target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
 
+add_executable(eigen_sd ./old_command_pattern/serial_deserial_test_eigen3.cpp)
+target_link_libraries(eigen_sd PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "dependencies": [
     "spdlog",
-
+    "eigen3",
     {
       "name": "reflectcpp",
       "features": [

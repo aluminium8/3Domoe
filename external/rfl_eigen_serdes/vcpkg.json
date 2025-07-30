@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "rfl-eigen-serdes",
+  "version": "1.0.0",
+  "dependencies": [
+    "eigen3",
+    {
+      "name": "reflectcpp",
+      "features": [
+        "toml"
+      ]
+    }
+  ],
+  "features": {
+    "testing": {
+      "description": "Build unit tests for the application.",
+      "dependencies": [
+        "boost-test"
+      ]
+    }
+  }
+}

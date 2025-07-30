@@ -41,4 +41,4 @@ public:
 };
 
 // コンセプトを満たしていることをコンパイラにチェックさせる (任意)
-static_assert(Cartridge<GenerateCentroidsCartridge>);
+static_assert(Cartridge<BIGprocess_mock_cartridge>);

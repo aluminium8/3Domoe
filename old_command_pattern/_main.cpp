@@ -4,11 +4,8 @@
 
 #include <Eigen/Dense>
 
-
 #include "_CommandProcessor.hpp"
 #include "_GenerateCentroidsCartridge.hpp"
-
-
 
 
 int main()
@@ -16,16 +13,15 @@ int main()
 
     struct MYmatrix
     {
-        std::vector<std::vector<double >>mat;
+        std::vector<std::vector<double>> mat;
         int ID;
     };
     const auto mat1 =
-        MYmatrix{.mat = {{2,2},{3,3}},
-               .ID = 45};
+        MYmatrix{.mat = {{2, 2}, {3, 3}},
+                 .ID = 45};
     // We can now write into and read from a JSON string.
     const std::string toml_string = rfl::toml::write(mat1);
-    std::cout<<toml_string<<std::endl;
-
+    std::cout << toml_string << std::endl;
 
     struct eigenmatrix
     {
@@ -33,13 +29,12 @@ int main()
         int ID;
     };
     const auto mat2 =
-        eigenmatrix{.mat =Eigen::MatrixXd::Random(3, 4),
-               .ID = 45};
-
+        eigenmatrix{.mat = Eigen::MatrixXd::Random(3, 4),
+                    .ID = 45};
 
     //// We can now write into and read from a JSON string.
-    //const std::string toml2_string = rfl::toml::write(mat2);
-    //std::cout<<toml2_string<<std::endl;
+    // const std::string toml2_string = rfl::toml::write(mat2);
+    // std::cout<<toml2_string<<std::endl;
 
     CommandProcessor processor;
 
@@ -80,6 +75,7 @@ int main()
     {
         std::cout << "Client: Task failed! Reason: " << error->error_message << std::endl;
     }
+
 
     return 0;
 }

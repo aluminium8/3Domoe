@@ -12,13 +12,15 @@
 // (関数の中身は前回と同じ)
 void print_result(uint64_t id, const std::optional<CommandResult>& result) {
     std::cout << "\nClient: Querying result for command ID " << id << "..." << std::endl;
+
     if (!result) {
         std::cout << "  Result not found or not ready." << std::endl;
         return;
     }
     if (const auto* success = std::get_if<SuccessResult>(&(*result))) {
-        std::cout << "  Task " << id << " Succeeded!" << std::endl;
+        std::cout << "  Task " << id << " Succeeded!!! command name: "<<success->command_name<<std::endl;
         std::cout << "  Raw Output TOML:\n" << success->output_toml << std::endl;
+            
         auto output = rfl::toml::read<GenerateCentroidsCartridge_mock::Output>(
             success->output_toml);
         if (output) {
@@ -49,20 +51,20 @@ int main() {
     const std::string invalid_toml = R"(invalid_field = 999)";
 
     std::cout << "\n--- Client adding commands to the queue ---" << std::endl;
-    uint64_t id1 = processor.add_to_queue(command_name, input_toml1);
-    uint64_t id2 = processor.add_to_queue(command_name2, input_toml2);
-    uint64_t id3 = processor.add_to_queue(invalid_command, input_toml1);
-    uint64_t id4 = processor.add_to_queue(command_name2, invalid_toml);
-    uint64_t id5 = processor.add_to_queue(command_name2, input_toml1);
+    uint64_t id0 = processor.add_to_queue(command_name, input_toml1);
+    uint64_t id1 = processor.add_to_queue(command_name2, input_toml2);
+    uint64_t id2 = processor.add_to_queue(invalid_command, input_toml1);
+    uint64_t id3 = processor.add_to_queue(command_name2, invalid_toml);
+    uint64_t id4 = processor.add_to_queue(command_name2, input_toml1);
     std::cout << "\nAll commands have been enqueued. No execution has happened yet." << std::endl;
 
     processor.process_queue();
 
     std::cout << "\n--- Client retrieving results from repository ---" << std::endl;
+    print_result(id0, result_repo->get_result(id0));
     print_result(id1, result_repo->get_result(id1));
     print_result(id2, result_repo->get_result(id2));
     print_result(id3, result_repo->get_result(id3));
     print_result(id4, result_repo->get_result(id4));
-    print_result(id5, result_repo->get_result(id4));
     return 0;
 }

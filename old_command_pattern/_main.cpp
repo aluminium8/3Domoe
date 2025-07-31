@@ -5,8 +5,8 @@
 #include <Eigen/Dense>
 
 
-#include "CommandProcessor.hpp"
-#include "GenerateCentroidsCartridge.hpp"
+#include "_CommandProcessor.hpp"
+#include "_GenerateCentroidsCartridge.hpp"
 
 
 

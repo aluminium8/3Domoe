@@ -10,6 +10,7 @@
 #include <memory>
 #include <queue>
 #include <string>
+#include <any>
 
 // (中身は前回と同じ。実装はヘッダに残す)
 class CommandProcessor {
@@ -26,6 +27,14 @@ public:
                                        input_obj.error().what()};
                 }
                 typename C::Output output_obj = cartridge.execute(*input_obj);
+
+             
+
+                SuccessResult result_capsule;
+                result_capsule.output_toml=rfl::toml::write(output_obj);
+                result_capsule.output_raw=output_obj;
+
+
                 return SuccessResult{rfl::toml::write(output_obj)};
             } catch (const std::exception& e) {
                 return ErrorResult{

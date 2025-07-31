@@ -73,8 +73,8 @@ target_include_directories(main PRIVATE include)
 
 
 #TODO old files must be deleted
-add_executable(old_main ./old_command_pattern/main.cpp)
-target_link_libraries(old_main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
+add_executable(_old_main ./old_command_pattern/_main.cpp)
+target_link_libraries(_old_main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
 
-add_executable(old_eigen_sd ./old_command_pattern/serial_deserial_test_eigen3.cpp)
-target_link_libraries(old_eigen_sd PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)
+add_executable(_old_eigen_sd ./old_command_pattern/_serial_deserial_test_eigen3.cpp)
+target_link_libraries(_old_eigen_sd PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)

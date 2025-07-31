@@ -20,6 +20,7 @@ concept Cartridge = requires(T cartridge, const typename T::Input& input) {
 // 成功時はシリアライズされたOutput(TOML文字列)を、失敗時はエラー情報を保持
 struct SuccessResult {
     std::string output_toml;
+    std::any output_raw;
 };
 struct ErrorResult {
     std::string error_message;

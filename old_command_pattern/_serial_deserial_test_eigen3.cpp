@@ -2,10 +2,12 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <stdexcept>
+#include <array>
 
 #include "rfl.hpp"
 
-// --- 型定義 (変更なし) ---
+// --- 型定義 ---
 struct MESH_ID { int id; };
 struct MESH { std::string data; };
 struct TEXTURE_ID { int id; };
@@ -25,42 +27,53 @@ struct LoadedAsset {
     std::string name;
 };
 
-// 変換先 2 (Destination 2) - 一部のフィールドのみを持つ
+// 変換先 2 (Destination 2)
 struct AssetSummary {
     MESH mesh;
     std::string name;
 };
 
-// --- データストアとConverterクラス (前回と同じ) ---
-std::unordered_map<int, MESH> mesh_store = {{101, {"mesh_data_for_101"}}};
-std::unordered_map<int, TEXTURE> texture_store = {{5, {"/textures/tex_5.png"}}};
 
+// --- 変換ロジックを保持するクラス ---
 class AssetConverter {
 private:
+    // データストアへの参照をメンバ変数として持つ
     const std::unordered_map<int, MESH>& mesh_store_ref_;
     const std::unordered_map<int, TEXTURE>& texture_store_ref_;
+
+    // コンパイル時ヘルパー
     template <rfl::internal::StringLiteral str>
-    static consteval auto remove_id_suffix() { /* ... 実装は省略 ... */ 
+    static consteval auto remove_id_suffix() {
+        // 修正点: 呼び出し元で"_id"で終わることが保証されているため、if文を削除
         constexpr auto sv = str.string_view();
         constexpr auto new_sv = sv.substr(0, sv.size() - 3);
         constexpr auto new_size = new_sv.size();
         std::array<char, new_size + 1> arr{};
-        for (size_t i = 0; i < new_size; ++i) arr[i] = new_sv[i];
+        for (size_t i = 0; i < new_size; ++i) {
+            arr[i] = new_sv[i];
+        }
         arr[new_size] = '\0';
         return rfl::internal::StringLiteral<new_size + 1>(arr);
     }
+
 public:
+    // コンストラクタでデータストアへの参照を受け取る
     AssetConverter(const std::unordered_map<int, MESH>& ms, const std::unordered_map<int, TEXTURE>& ts)
         : mesh_store_ref_(ms), texture_store_ref_(ts) {}
+
+    // 実行時の値変換ロジック
     MESH operator()(const MESH_ID& id) const { return mesh_store_ref_.at(id.id); }
     TEXTURE operator()(const TEXTURE_ID& id) const { return texture_store_ref_.at(id.id); }
 
+    // 汎用的な変換を行うメンバ関数
     template <typename To, typename From>
     To convert(const From& from) const {
         const auto from_nt = rfl::to_named_tuple(from);
+
         const auto to_nt = from_nt.transform([&](auto&& field) {
             using FieldType = std::remove_cvref_t<decltype(field)>;
             constexpr auto name_literal = FieldType::name_;
+
             if constexpr (name_literal.string_view().ends_with("_id")) {
                 constexpr auto new_name_literal = remove_id_suffix<name_literal>();
                 auto new_value = (*this)(field.get());
@@ -69,17 +82,22 @@ public:
                 return std::forward<decltype(field)>(field);
             }
         });
+
         return rfl::from_named_tuple<To>(to_nt);
     }
 };
 
+
 int main() {
-    // データストアと変換元のオブジェクトを準備
+    // データストアはmain関数などのローカル変数として定義
     std::unordered_map<int, MESH> local_mesh_store = {{101, {"local_mesh_data"}}};
     std::unordered_map<int, TEXTURE> local_texture_store = {{5, {"/local/texture.png"}}};
-    SourceAsset source = {{101}, {5}, "MyObject"};
-    AssetConverter converter(local_mesh_store, local_texture_store);
 
+    SourceAsset source = {{101}, {5}, "MyObject"};
+
+    // Converterのインスタンスを生成し、ローカルのストアを渡す
+    AssetConverter converter(local_mesh_store, local_texture_store);
+    
     // --- 同じconvert関数を、異なる変換先を指定して呼び出す ---
 
     // 1. LoadedAssetに変換
@@ -96,7 +114,6 @@ int main() {
     std::cout << "--- Converted to AssetSummary ---" << std::endl;
     std::cout << "Name: " << summary.name << std::endl;
     std::cout << "Mesh Data: " << summary.mesh.data << std::endl;
-    // (summaryにはtextureメンバがないのでアクセスできない)
 
     return 0;
 }

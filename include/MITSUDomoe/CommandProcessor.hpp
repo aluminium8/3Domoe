@@ -35,7 +35,7 @@ public:
                 result_capsule.output_raw=output_obj;
 
 
-                return SuccessResult{rfl::toml::write(output_obj)};
+                return result_capsule;
             } catch (const std::exception& e) {
                 return ErrorResult{
                     "An exception occurred during command execution: " +

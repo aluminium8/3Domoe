@@ -5,7 +5,7 @@
 #include "rfl_eigen_serdes.hpp" // テスト対象のヘッダ
 #include <Eigen/Dense>
 #include <string>
-
+#include <rfl/json.hpp>
 // ------------------- テスト用の構造体定義 -------------------
 
 // デフォルトの列優先 (ColMajor) 行列を持つ構造体

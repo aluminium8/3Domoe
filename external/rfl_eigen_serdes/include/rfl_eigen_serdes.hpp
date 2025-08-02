@@ -1,7 +1,7 @@
 #pragma once
 
 #include <rfl.hpp>
-#include <rfl/json.hpp>
+
 #include <Eigen/Dense>
 
 #include <stdexcept>

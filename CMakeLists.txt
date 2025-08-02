@@ -78,3 +78,11 @@ target_link_libraries(_old_main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Ei
 
 add_executable(_old_eigen_sd ./old_command_pattern/_serial_deserial_test_eigen3.cpp)
 target_link_libraries(_old_eigen_sd PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)
+
+add_executable(_old_accessor ./old_command_pattern/accessor_test.cpp)
+target_link_libraries(_old_accessor PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)
+add_executable(_old_generic_access ./old_command_pattern/generic_access.cpp)
+target_link_libraries(_old_generic_access PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)
+
+add_executable(_old_eigen3_rfl_generic_test ./old_command_pattern/eigen3_rfl_generic_test.cpp)
+target_link_libraries(_old_eigen3_rfl_generic_test PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)

@@ -3,7 +3,7 @@
 #include <concepts>
 #include <string>
 #include <variant>
-#include <any>
+
 
 // 全てのカートリッジが満たすべき規約(コンセプト)
 template<typename T>

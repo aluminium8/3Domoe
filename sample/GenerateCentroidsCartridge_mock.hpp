@@ -4,23 +4,26 @@
 #include <rfl.hpp>
 #include <vector>
 
-
-class GenerateCentroidsCartridge_mock {
+class GenerateCentroidsCartridge_mock
+{
 public:
     // 1. 入力用の構造体を定義
-    struct Input {
+    struct Input
+    {
         unsigned int input_mesh_id;
     };
 
     // 2. 出力用の構造体を定義 (複数の値を返す例)
-    struct Output {
+    struct Output
+    {
         unsigned int generated_point_cloud_id;
         size_t num_generated_points;
         std::string message;
     };
-
+    std::string description = "Mock cartridge of polygon processing";
     // 3. 処理本体を実装
-    Output execute(const Input& input) const {
+    Output execute(const Input &input) const
+    {
         std::cout << "\n--- Executing GenerateCentroidsCartridge ---" << std::endl;
         std::cout << "  Processing Mesh ID: " << input.input_mesh_id << std::endl;
 
@@ -31,8 +34,7 @@ public:
         return Output{
             .generated_point_cloud_id = input.input_mesh_id + 1000,
             .num_generated_points = generated_count,
-            .message = "Successfully generated " + std::to_string(generated_count) + " points."
-        };
+            .message = "Successfully generated " + std::to_string(generated_count) + " points."};
     }
 };
 

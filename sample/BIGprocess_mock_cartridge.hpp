@@ -21,16 +21,17 @@ public:
         unsigned int generated_point_cloud_id;
         std::string message;
     };
-
-    // 3. 処理本体を実装
-    Output execute(const Input &input) const
+    std::string description="Mock cartridge of long process";
+        // 3. 処理本体を実装
+        Output
+        execute(const Input &input) const
     {
         std::cout << "\n--- Executing BIGprocess_mock_cartridge (by sleep) ---" << std::endl;
         std::cout << "  Processing Mesh ID: " << input.input_mesh_id << std::endl;
 
         // 3秒間スリープ
-        std::cout << "sleep 3 sec..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::cout << "sleep 1 sec..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
         std::cout << "sleep finished" << std::endl;
 
         // Output構造体に結果を詰めて返す

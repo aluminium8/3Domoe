@@ -18,9 +18,9 @@ void print_result(uint64_t id, const std::optional<CommandResult>& result) {
     }
     if (const auto* success = std::get_if<SuccessResult>(&(*result))) {
         std::cout << "  Task " << id << " Succeeded!" << std::endl;
-        std::cout << "  Raw Output TOML:\n" << success->output_toml << std::endl;
-        auto output = rfl::toml::read<GenerateCentroidsCartridge_mock::Output>(
-            success->output_toml);
+        std::cout << "  Raw Output JSON:\n" << success->output_json << std::endl;
+        auto output = rfl::json::read<GenerateCentroidsCartridge_mock::Output>(
+            success->output_json);
         if (output) {
             std::cout << "  Deserialized Message: " << output->message << std::endl;
         } else {
@@ -40,20 +40,20 @@ int main() {
     processor.register_cartridge("BIGprocess_mock_cartridge",BIGprocess_mock_cartridge{});
 
     const std::string command_name = "generateCentroids";
-    const std::string input_toml1 = R"(input_mesh_id = 101)";
-    const std::string input_toml2 = R"(input_mesh_id = 202)";
+    const std::string input_json1 = R"(input_mesh_id = 101)";
+    const std::string input_json2 = R"(input_mesh_id = 202)";
     const std::string command_name2 = "BIGprocess_mock_cartridge";
 
     
     const std::string invalid_command = "nonExistentCommand";
-    const std::string invalid_toml = R"(invalid_field = 999)";
+    const std::string invalid_json = R"(invalid_field = 999)";
 
     std::cout << "\n--- Client adding commands to the queue ---" << std::endl;
-    uint64_t id1 = processor.add_to_queue(command_name, input_toml1);
-    uint64_t id2 = processor.add_to_queue(command_name2, input_toml2);
-    uint64_t id3 = processor.add_to_queue(invalid_command, input_toml1);
-    uint64_t id4 = processor.add_to_queue(command_name2, invalid_toml);
-    uint64_t id5 = processor.add_to_queue(command_name2, input_toml1);
+    uint64_t id1 = processor.add_to_queue(command_name, input_json1);
+    uint64_t id2 = processor.add_to_queue(command_name2, input_json2);
+    uint64_t id3 = processor.add_to_queue(invalid_command, input_json1);
+    uint64_t id4 = processor.add_to_queue(command_name2, invalid_json);
+    uint64_t id5 = processor.add_to_queue(command_name2, input_json1);
     std::cout << "\nAll commands have been enqueued. No execution has happened yet." << std::endl;
 
     processor.process_queue();

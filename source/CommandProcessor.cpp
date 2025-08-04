@@ -5,12 +5,12 @@
 CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo)
     : result_repo_(std::move(repo)) {}
 
-uint64_t CommandProcessor::add_to_queue(const std::string& command_name, const std::string& input_toml) {
+uint64_t CommandProcessor::add_to_queue(const std::string& command_name, const std::string& input_json) {
     const uint64_t id = next_command_id_++;
     std::function<CommandResult()> task_logic;
     if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end()) {
-        task_logic = [handler = it->second.handler, input_toml] {
-            return handler(input_toml);
+        task_logic = [handler = it->second.handler, input_json] {
+            return handler(input_json);
         };
     } else {
         task_logic = [command_name] {

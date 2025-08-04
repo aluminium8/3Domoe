@@ -42,4 +42,4 @@ public:
 };
 
 // コンセプトを満たしていることをコンパイラにチェックさせる (任意)
-static_assert(Cartridge<BIGprocess_mock_cartridge>);
+static_assert(MITSU_Domoe::Cartridge<BIGprocess_mock_cartridge>);

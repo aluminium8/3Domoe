@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0)
+cmake_minimum_required(VERSION 3.28)
 project(rfl_test C CXX)
 
 message(${CMAKE_SOURCE_DIR})
@@ -94,3 +94,7 @@ add_executable(_old_glfw_eigen3_draw_test ./old_command_pattern/glfw_eigen3_draw
 target_link_libraries(_old_glfw_eigen3_draw_test PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui rfl_eigen_serdes)
 add_executable(_old_glfw_eigen3_draw_test_from_libigl ./old_command_pattern/glfw_eigen3_draw_test_from_libigl.cpp)
 target_link_libraries(_old_glfw_eigen3_draw_test_from_libigl PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui igl::igl_core  rfl_eigen_serdes)
+
+
+#add_executable(_old_input_type_register_test ./old_command_pattern/input_type_register_test.cpp)
+#target_link_libraries(_old_input_type_register_test PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui igl::igl_core  rfl_eigen_serdes)

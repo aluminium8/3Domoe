@@ -6,6 +6,8 @@
 #include <optional>
 #include <cstdint>
 
+namespace MITSU_Domoe {
+
 // (中身は前回と同じ)
 class ResultRepository {
 public:
@@ -17,3 +19,5 @@ private:
     std::map<uint64_t, CommandResult> results_;
     std::mutex mutex_;
 };
+
+} // namespace MITSU_Domoe

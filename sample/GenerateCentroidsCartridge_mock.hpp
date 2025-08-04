@@ -39,4 +39,4 @@ public:
 };
 
 // コンセプトを満たしていることをコンパイラにチェックさせる (任意)
-static_assert(Cartridge<GenerateCentroidsCartridge_mock>);
+static_assert(MITSU_Domoe::Cartridge<GenerateCentroidsCartridge_mock>);

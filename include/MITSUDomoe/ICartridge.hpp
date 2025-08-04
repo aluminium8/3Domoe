@@ -5,6 +5,8 @@
 #include <variant>
 #include <any>
 
+namespace MITSU_Domoe {
+
 // 全てのカートリッジが満たすべき規約(コンセプト)
 template<typename T>
 concept Cartridge = requires(T cartridge, const typename T::Input& input) {
@@ -19,10 +21,10 @@ concept Cartridge = requires(T cartridge, const typename T::Input& input) {
 };
 
 // コマンド実行結果の汎用的な表現
-// 成功時はシリアライズされたOutput(json文字列)を、失敗時はエラー情報を保持
+// 成功時はシリアライズされたOutput(TOML文字列)を、失敗時はエラー情報を保持
 struct SuccessResult {
     std::string command_name;
-    std::string output_json;
+    std::string output_toml;
     std::any input_raw;
     std::any output_raw;
 };
@@ -30,3 +32,5 @@ struct ErrorResult {
     std::string error_message;
 };
 using CommandResult = std::variant<SuccessResult, ErrorResult>;
+
+} // namespace MITSU_Domoe

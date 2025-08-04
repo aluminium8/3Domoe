@@ -1,16 +1,18 @@
 #include <MITSUDomoe/CommandProcessor.hpp>
 #include <iostream>
 
+namespace MITSU_Domoe {
+
 // (中身は前回と同じ)
 CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo)
     : result_repo_(std::move(repo)) {}
 
-uint64_t CommandProcessor::add_to_queue(const std::string& command_name, const std::string& input_json) {
+uint64_t CommandProcessor::add_to_queue(const std::string& command_name, const std::string& input_toml) {
     const uint64_t id = next_command_id_++;
     std::function<CommandResult()> task_logic;
     if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end()) {
-        task_logic = [handler = it->second.handler, input_json] {
-            return handler(input_json);
+        task_logic = [handler = it->second.handler, input_toml] {
+            return handler(input_toml);
         };
     } else {
         task_logic = [command_name] {
@@ -36,3 +38,5 @@ void CommandProcessor::process_queue() {
     }
     std::cout << "--- Command queue processed ---" << std::endl;
 }
+
+} // namespace MITSU_Domoe

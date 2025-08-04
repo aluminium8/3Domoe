@@ -29,13 +29,13 @@ endif()
 
 #find_package(metis REQUIRED)
 find_package(spdlog REQUIRED)
-
-
-
 find_package(reflectcpp CONFIG REQUIRED)
 find_package(Eigen3  CONFIG REQUIRED)
 
-
+find_package(libigl CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(glad CONFIG REQUIRED)
 # サブモジュールを追加 (テストとサンプルは不要なのでOFFにする)
 # add_subdirectory を呼び出す前に、サブディレクトリのオプションを設定
 set(BUILD_TESTS OFF CACHE BOOL "Disable tests for rfl_eigen_serdes" FORCE)
@@ -86,3 +86,11 @@ target_link_libraries(_old_generic_access PRIVATE spdlog::spdlog reflectcpp::ref
 
 add_executable(_old_eigen3_rfl_generic_test ./old_command_pattern/eigen3_rfl_generic_test.cpp)
 target_link_libraries(_old_eigen3_rfl_generic_test PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen     rfl_eigen_serdes)
+
+
+add_executable(_old_glfw_eigen3_test ./old_command_pattern/glfw_eigen3_test.cpp)
+target_link_libraries(_old_glfw_eigen3_test PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui rfl_eigen_serdes)
+add_executable(_old_glfw_eigen3_draw_test ./old_command_pattern/glfw_eigen3_draw_test.cpp)
+target_link_libraries(_old_glfw_eigen3_draw_test PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui rfl_eigen_serdes)
+add_executable(_old_glfw_eigen3_draw_test_from_libigl ./old_command_pattern/glfw_eigen3_draw_test_from_libigl.cpp)
+target_link_libraries(_old_glfw_eigen3_draw_test_from_libigl PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui igl::igl_core  rfl_eigen_serdes)

@@ -7,9 +7,18 @@
     {
       "name": "reflectcpp",
       "features": [
-        "toml"
+        "toml",
+        "yaml"
+      ]
+    },
+    "glfw3",
+    "glad",
+    "libigl",
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding"
       ]
     }
-
   ]
 }

@@ -4,7 +4,14 @@ project(rfl_test C CXX)
 message(${CMAKE_SOURCE_DIR})
 enable_testing()
 #set(CMAKE_CXX_FLAGS "/std:c++20")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8 /std:c++20")
+if(MSVC)
+    # Flags for Microsoft Visual C++
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++20 /utf-8")
+else()
+    # Flags for GCC/Clang
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+endif()
+
 message(${CMAKE_CXX_FLAGS})
 if(WIN32)
     message("this is windows")

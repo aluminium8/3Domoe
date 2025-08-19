@@ -17,14 +17,16 @@ concept Cartridge = requires(T cartridge, const typename T::Input& input) {
     // Output execute(const Input&) というシグネチャのメソッドを持つこと
     { cartridge.execute(input) } -> std::same_as<typename T::Output>;
     // std::stringに変換可能であることを要求
+    { T::command_name } -> std::convertible_to<std::string>;
     { T::description } -> std::convertible_to<std::string>;
+    
 };
 
 // コマンド実行結果の汎用的な表現
-// 成功時はシリアライズされたOutput(TOML文字列)を、失敗時はエラー情報を保持
+// 成功時はシリアライズされたOutput(JSON文字列)を、失敗時はエラー情報を保持
 struct SuccessResult {
     std::string command_name;
-    std::string output_toml;
+    std::string output_json;
     std::any input_raw;
     std::any output_raw;
 };

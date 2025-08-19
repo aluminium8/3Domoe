@@ -8,6 +8,7 @@
 #include "_CommandProcessor.hpp"
 #include "_GenerateCentroidsCartridge.hpp"
 
+#include <rfl/json.hpp>
 
 
 
@@ -23,8 +24,8 @@ int main()
         MYmatrix{.mat = {{2,2},{3,3}},
                .ID = 45};
     // We can now write into and read from a JSON string.
-    const std::string toml_string = rfl::toml::write(mat1);
-    std::cout<<toml_string<<std::endl;
+    const std::string json_string = rfl::json::write(mat1);
+    std::cout<<json_string<<std::endl;
 
 
     struct eigenmatrix
@@ -38,8 +39,8 @@ int main()
 
 
     //// We can now write into and read from a JSON string.
-    //const std::string toml2_string = rfl::toml::write(mat2);
-    //std::cout<<toml2_string<<std::endl;
+    //const std::string json2_string = rfl::json::write(mat2);
+    //std::cout<<json2_string<<std::endl;
 
     CommandProcessor processor;
 
@@ -50,10 +51,10 @@ int main()
 
     // 2. GUIからコマンド発行をシミュレート
     const std::string command_name = "generateCentroids";
-    const std::string input_toml = R"(input_mesh_id = 101)";
+    const std::string input_json = R"(input_mesh_id = 101)";
 
     // 3. タスクを作成し、ワーカースレッドへ渡す
-    auto [task, future] = processor.create_task(command_name, input_toml);
+    auto [task, future] = processor.create_task(command_name, input_json);
     std::cout << "\nClient: Dispatching '" << command_name << "' task..." << std::endl;
     // 修正後
     auto handle = std::async(std::launch::async, std::move(task));
@@ -66,10 +67,10 @@ int main()
     if (auto *success = std::get_if<SuccessResult>(&result))
     {
         std::cout << "Client: Task succeeded!" << std::endl;
-        std::cout << "  Raw Output TOML: " << success->output_toml << std::endl;
+        std::cout << "  Raw Output json: " << success->output_json << std::endl;
 
         // 必要に応じて、クライアント側でOutputオブジェクトにデシリアライズ
-        auto output = rfl::toml::read<GenerateCentroidsCartridge::Output>(success->output_toml);
+        auto output = rfl::json::read<GenerateCentroidsCartridge::Output>(success->output_json);
         if (output)
         {
             std::cout << "  Deserialized Message: " << output->message << std::endl;

@@ -3,16 +3,28 @@
 #include "MITSUDomoe/ICartridge.hpp"
 #include <rfl.hpp>
 #include <vector>
+#include <string>
+#include "MITSUDomoe/3D_objects.hpp"
 
-class GenerateCentroidsCartridge_mock
+class Need_many_arg_mock_cartridge
 {
 public:
     // 1. 入力用の構造体を定義
     struct Input
     {
         unsigned int input_mesh_id;
-    };
+        int i;
+        long l;
+        long long ll;
+        double d;
+        std::string s;
+        MITSU_Domoe::Polygon_mesh pm;
+        MITSU_Domoe::Polygon_clusters pc;
+        MITSU_Domoe::Point_cloud pointcloud;
 
+    };
+    
+    std::string command_name="Need_many_arg_mock";
     // 2. 出力用の構造体を定義 (複数の値を返す例)
     struct Output
     {
@@ -20,8 +32,6 @@ public:
         size_t num_generated_points;
         std::string message;
     };
-    
-    std::string command_name="GenerateCentroids_mock";
     std::string description = "Mock cartridge of polygon processing";
     // 3. 処理本体を実装
     Output execute(const Input &input) const
@@ -41,4 +51,4 @@ public:
 };
 
 // コンセプトを満たしていることをコンパイラにチェックさせる (任意)
-static_assert(MITSU_Domoe::Cartridge<GenerateCentroidsCartridge_mock>);
+static_assert(MITSU_Domoe::Cartridge<Need_many_arg_mock_cartridge>);

@@ -9,6 +9,7 @@
 class BIGprocess_mock_cartridge
 {
 public:
+    
     // 1. 入力用の構造体を定義
     struct Input
     {
@@ -21,10 +22,11 @@ public:
         unsigned int generated_point_cloud_id;
         std::string message;
     };
-    std::string description="Mock cartridge of long process";
-        // 3. 処理本体を実装
-        Output
-        execute(const Input &input) const
+    std::string command_name="BIGprocess_mock";
+    std::string description = "Mock cartridge of long process";
+    // 3. 処理本体を実装
+    Output
+    execute(const Input &input) const
     {
         std::cout << "\n--- Executing BIGprocess_mock_cartridge (by sleep) ---" << std::endl;
         std::cout << "  Processing Mesh ID: " << input.input_mesh_id << std::endl;

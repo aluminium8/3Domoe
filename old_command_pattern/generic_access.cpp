@@ -4,7 +4,7 @@
 
 #include "rfl.hpp"
 #include "rfl/from_generic.hpp"
-#include "rfl/toml.hpp"
+#include "rfl/json.hpp"
 
 // 出力用のヘルパー関数
 void print_matrix(const std::vector<std::vector<double>>& matrix) {
@@ -18,9 +18,9 @@ void print_matrix(const std::vector<std::vector<double>>& matrix) {
 }
 
 int main() {
-    // 元の構造が不明なTOMLデータ
-    const std::string toml_string = R"(
-        title = "TOML Example"
+    // 元の構造が不明なjsonデータ
+    const std::string json_string = R"(
+        title = "json Example"
         
         [owner]
         name = "Tom Preston-Werner"
@@ -34,19 +34,19 @@ int main() {
         enabled = true
     )";
 
-    // 1. TOMLをrfl::Genericにパースする
-    const rfl::Result<rfl::Generic> parsed_toml =
-        rfl::toml::read<rfl::Generic>(toml_string);
+    // 1. jsonをrfl::Genericにパースする
+    const rfl::Result<rfl::Generic> parsed_json =
+        rfl::json::read<rfl::Generic>(json_string);
 
-    if (!parsed_toml) {
-        std::cerr << "Failed to parse TOML: " << parsed_toml.error().what()
+    if (!parsed_json) {
+        std::cerr << "Failed to parse json: " << parsed_json.error().what()
                   << std::endl;
         return 1;
     }
 
     // 2. "owner"テーブル内の"V"フィールドをrfl::Genericとして抽出する (修正箇所)
     const rfl::Result<rfl::Generic> V_generic =
-        parsed_toml->to_object()
+        parsed_json->to_object()
         .and_then([](const rfl::Generic::Object& root_obj) {
             return root_obj.get("owner");
         })

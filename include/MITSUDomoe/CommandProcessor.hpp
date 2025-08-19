@@ -3,8 +3,11 @@
 #include "ICartridge.hpp"
 #include "ResultRepository.hpp"
 #include <rfl/toml.hpp>
+#include <rfl/json.hpp>
 #include <atomic>
 #include <functional>
+#include <type_traits>
+#include <typeinfo>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -53,11 +56,21 @@ public:
         };
 
         cartridge_manager[command_name].description = cartridge.description;
+
+        auto nt = rfl::to_named_tuple(typename C::Input{});
+        std::map<std::string, std::string> schema;
+        nt.apply([&](const auto& f) {
+            schema[std::string(f.name())] = typeid(typename std::remove_pointer_t<decltype(f.value())>).name();
+        });
+        cartridge_manager[command_name].input_schema = rfl::json::write(schema);
+
         std::cout << "Cartridge registered: " << command_name << std::endl;
     }
 
     uint64_t add_to_queue(const std::string& command_name, const std::string& input_toml);
     void process_queue();
+
+    std::map<std::string, std::string> get_cartridge_schemas() const;
 
 private:
     // CommandProcessorの内部クラスとして定義すると良い
@@ -71,8 +84,9 @@ private:
 
         // 3. 将来のための拡張
         std::string description; // GUIに表示するコマンドの説明
+        std::string input_schema;
     };
-    
+
     std::map<std::string, Cartridge_info> cartridge_manager;
     //std::map<std::string, std::function<CommandResult(const std::string&)>> handlers_;
     std::queue<std::pair<uint64_t, std::function<CommandResult()>>> command_queue_;

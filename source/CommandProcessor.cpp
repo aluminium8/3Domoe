@@ -39,4 +39,12 @@ void CommandProcessor::process_queue() {
     std::cout << "--- Command queue processed ---" << std::endl;
 }
 
+std::map<std::string, std::string> CommandProcessor::get_cartridge_schemas() const {
+    std::map<std::string, std::string> schemas;
+    for (const auto& [name, info] : cartridge_manager) {
+        schemas[name] = info.input_schema;
+    }
+    return schemas;
+}
+
 } // namespace MITSU_Domoe

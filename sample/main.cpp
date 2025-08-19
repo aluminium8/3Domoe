@@ -39,12 +39,18 @@ int main() {
     processor.register_cartridge("generateCentroids", GenerateCentroidsCartridge_mock{});
     processor.register_cartridge("BIGprocess_mock_cartridge",BIGprocess_mock_cartridge{});
 
+    std::cout << "\n--- Cartridge Schemas ---" << std::endl;
+    auto schemas = processor.get_cartridge_schemas();
+    for (const auto& [name, schema] : schemas) {
+        std::cout << "Cartridge: " << name << "\nSchema: " << schema << std::endl;
+    }
+
     const std::string command_name = "generateCentroids";
     const std::string input_toml1 = R"(input_mesh_id = 101)";
     const std::string input_toml2 = R"(input_mesh_id = 202)";
     const std::string command_name2 = "BIGprocess_mock_cartridge";
 
-    
+
     const std::string invalid_command = "nonExistentCommand";
     const std::string invalid_toml = R"(invalid_field = 999)";
 

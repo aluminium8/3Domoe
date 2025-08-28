@@ -72,7 +72,7 @@ target_link_libraries(CommandProcessor PRIVATE spdlog::spdlog reflectcpp::reflec
 target_include_directories(CommandProcessor PRIVATE include)
 
 add_executable(main ./sample/main.cpp)
-target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor )
+target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes)
 target_include_directories(main PRIVATE include)
 
 

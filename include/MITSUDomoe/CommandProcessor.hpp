@@ -24,65 +24,29 @@ namespace MITSU_Domoe
     public:
         CommandProcessor(std::shared_ptr<ResultRepository> repo);
 
-        //template <Cartridge C>
-        //void register_cartridge(const std::string &command_name, C cartridge)
-        //{
-
-        //    
-        //    if(cartridge_manager.count(command_name)){
-        //        std::cout<<"WARN: cartridge will be overwritten"<<std::endl;
-        //    }
-        //    cartridge_manager[command_name].handler = [cartridge, command_name, this](const std::string &input_json) -> CommandResult
-        //    {
-        //        try
-        //        {
-        //            auto input_obj = rfl::json::read<typename C::Input>(input_json);
-        //            if (!input_obj)
-        //            {
-        //                return ErrorResult{"Input JSON deserialization failed: " +
-        //                                   input_obj.error().what()};
-        //            }
-
-        //            typename C::Output output_obj = cartridge.execute(*input_obj);
-
-        //            SuccessResult result_capsule;
-        //            result_capsule.input_raw = input_obj;
-        //            result_capsule.output_json = rfl::json::write(output_obj);
-        //            result_capsule.output_raw = output_obj;
-        //            result_capsule.command_name = command_name;
-
-        //            return result_capsule;
-        //        }
-        //        catch (const std::exception &e)
-        //        {
-        //            return ErrorResult{
-        //                "An exception occurred during command execution: " +
-        //                std::string(e.what())};
-        //        }
-        //    };
-
-        //    cartridge_manager[command_name].description = cartridge.description;
-
-        //    for (const auto &f : rfl::fields<typename C::Input>())
-        //    {
-        //        cartridge_manager[command_name].input_schema.arg_names_to_type[f.name()] = f.type();
-        //    }
-        //    for (const auto &arg : cartridge_manager[command_name].input_schema.arg_names_to_type)
-        //    {
-        //        std::cout << "name: " << arg.first << ", type: " << arg.second << std::endl;
-        //    }
-
-        //    std::cout << "Cartridge registered: " << command_name << std::endl;
-        //}
-
         template <Cartridge C>
         void register_cartridge(C cartridge)
         {
 
-            std::string command_name=cartridge.command_name;            
+            std::string command_name=cartridge.command_name;    
+            std::cout<<"command_name:"<< command_name<<std::endl;        
             if(cartridge_manager.count(command_name)){
                 std::cout<<"WARN: cartridge will be overwritten"<<std::endl;
             }
+
+
+            cartridge_manager[command_name].description = cartridge.description;
+
+            for (const auto &f : rfl::fields<typename C::Input>())
+            {
+                cartridge_manager[command_name].input_schema.arg_names_to_type[f.name()] = f.type();
+            }
+            for (const auto &arg : cartridge_manager[command_name].input_schema.arg_names_to_type)
+            {
+                std::cout << "name: " << arg.first << ", type: " << arg.second << std::endl;
+            }
+
+
             cartridge_manager[command_name].handler = [cartridge, command_name, this](const std::string &input_json) -> CommandResult
             {
                 try
@@ -112,16 +76,7 @@ namespace MITSU_Domoe
                 }
             };
 
-            cartridge_manager[command_name].description = cartridge.description;
 
-            for (const auto &f : rfl::fields<typename C::Input>())
-            {
-                cartridge_manager[command_name].input_schema.arg_names_to_type[f.name()] = f.type();
-            }
-            for (const auto &arg : cartridge_manager[command_name].input_schema.arg_names_to_type)
-            {
-                std::cout << "name: " << arg.first << ", type: " << arg.second << std::endl;
-            }
 
             std::cout << "Cartridge registered: " << command_name << std::endl;
         }

@@ -9,6 +9,7 @@
 #include "GenerateCentroidsCartridge_mock.hpp"
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
+#include "ReadStlCartridge.hpp"
 
 // (関数の中身は前回と同じ)
 void print_result(uint64_t id, const std::optional<MITSU_Domoe::CommandResult> &result)
@@ -55,13 +56,15 @@ int main()
     processor.register_cartridge(BIGprocess_mock_cartridge{});
 
     processor.register_cartridge(Need_many_arg_mock_cartridge{});
-
+    processor.register_cartridge(ReadStlCartridge{});
     std::cout << "\n--- Cartridge Schemas ---" << std::endl;
 
     const std::string command_name = "GenerateCentroids_mock";
     const std::string input_json1 = R"({"input_mesh_id":  101})";
     const std::string input_json2 = R"({"input_mesh_id" : 202})";
     const std::string command_name2 = "BIGprocess_mock";
+    const std::string read_stl_command = "readStl";
+    const std::string read_stl_input = R"({"filepath": "sample/resource/tetra.stl"})";
 
     const std::string invalid_command = "nonExistentCommand";
     const std::string invalid_json = R"({"invalid_field" : 999})";
@@ -72,6 +75,8 @@ int main()
     uint64_t id3 = processor.add_to_queue(invalid_command, input_json1);
     uint64_t id4 = processor.add_to_queue(command_name2, invalid_json);
     uint64_t id5 = processor.add_to_queue(command_name2, input_json1);
+    uint64_t id6 = processor.add_to_queue(read_stl_command, read_stl_input);
+
     std::cout << "\nAll commands have been enqueued. No execution has happened yet." << std::endl;
 
     processor.process_queue();
@@ -81,7 +86,8 @@ int main()
     print_result(id2, result_repo->get_result(id2));
     print_result(id3, result_repo->get_result(id3));
     print_result(id4, result_repo->get_result(id4));
-    print_result(id5, result_repo->get_result(id4));
+    print_result(id5, result_repo->get_result(id5));
+    print_result(id6, result_repo->get_result(id6));
 
     return 0;
 }

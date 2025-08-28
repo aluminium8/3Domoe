@@ -4,6 +4,7 @@
 #include <string>
 #include <variant>
 #include <any>
+#include <map>
 
 namespace MITSU_Domoe {
 
@@ -19,7 +20,7 @@ concept Cartridge = requires(T cartridge, const typename T::Input& input) {
     // std::stringに変換可能であることを要求
     { T::command_name } -> std::convertible_to<std::string>;
     { T::description } -> std::convertible_to<std::string>;
-    
+
 };
 
 // コマンド実行結果の汎用的な表現
@@ -29,6 +30,7 @@ struct SuccessResult {
     std::string output_json;
     std::any input_raw;
     std::any output_raw;
+    std::map<std::string, std::string> output_schema;
 };
 struct ErrorResult {
     std::string error_message;

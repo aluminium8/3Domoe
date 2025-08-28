@@ -8,17 +8,44 @@ namespace MITSU_Domoe
     CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo)
         : result_repo_(std::move(repo)) {}
 
-    std::string CommandProcessor::resolve_refs(const std::string &input_json)
+    std::string CommandProcessor::resolve_refs(const std::string &input_json, const std::string& command_name_of_current_cmd)
     {
         const std::regex ref_regex(R"(\$ref:cmd\[(\d+)\]\.(\w+))");
         auto resolved_json = input_json;
-        std::smatch match;
 
+        // This is a simplified search for the key. It assumes one ref per JSON.
+        // A more robust solution would parse the JSON and traverse the DOM.
+        const std::regex key_finder_regex(R"(\"(\w+)\"\s*:\s*\"\$ref:cmd)");
+        std::smatch key_match;
+        std::string key_of_ref_field;
+        if(std::regex_search(input_json, key_match, key_finder_regex) && key_match.size() > 1) {
+            key_of_ref_field = key_match[1].str();
+        }
+
+        std::smatch match;
         while (std::regex_search(resolved_json, match, ref_regex))
         {
             const std::string full_match_str = match[0].str();
             const uint64_t cmd_id = std::stoull(match[1].str());
             const std::string member_name = match[2].str();
+
+            // Type Checking Logic
+            if (!key_of_ref_field.empty()) {
+                const auto& current_cartridge_info = cartridge_manager.at(command_name_of_current_cmd);
+                const auto& expected_type = current_cartridge_info.input_schema.arg_names_to_type.at(key_of_ref_field);
+
+                auto referenced_result = result_repo_->get_result(cmd_id);
+                if(referenced_result) {
+                    auto success_result = std::get_if<SuccessResult>(&(*referenced_result));
+                    if(success_result) {
+                        const auto& actual_type = success_result->output_schema.at(member_name);
+                        if (expected_type != actual_type) {
+                            throw std::runtime_error("Type mismatch for field '" + key_of_ref_field + "'. Expected " + expected_type + " but got " + actual_type + ".");
+                        }
+                    }
+                }
+            }
+
 
             auto result = result_repo_->get_result(cmd_id);
             if (!result) {
@@ -69,13 +96,10 @@ namespace MITSU_Domoe
 
         if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end())
         {
-            // The handler now also takes the original input_json.
-            // Resolution will happen at execution time in process_queue.
-            task_logic = [this, handler = it->second.handler, input_json]
+            task_logic = [this, handler = it->second.handler, input_json, command_name]
             {
-                // The actual handler is called inside a new lambda that first resolves refs.
                 try {
-                    const std::string resolved_input_json = this->resolve_refs(input_json);
+                    const std::string resolved_input_json = this->resolve_refs(input_json, command_name);
                     return handler(resolved_input_json);
                 } catch (const std::exception& e) {
                     return CommandResult(ErrorResult{"Error during reference resolution: " + std::string(e.what())});
@@ -105,7 +129,6 @@ namespace MITSU_Domoe
             auto [id, task] = std::move(command_queue_.front());
             command_queue_.pop();
             std::cout << "Executing command with ID " << id << "..." << std::endl;
-            // The reference resolution is now part of the task itself.
             CommandResult result = task();
             result_repo_->store_result(id, std::move(result));
             std::cout << "Result for command ID " << id << " stored." << std::endl

@@ -14,6 +14,12 @@
 #include <queue>
 #include <string>
 #include <any>
+#include <regex>
+#if __has_include(<yyjson.h>)
+#include <yyjson.h>
+#else
+#include "rfl/thirdparty/yyjson.h"
+#endif
 
 namespace MITSU_Domoe
 {
@@ -28,8 +34,8 @@ namespace MITSU_Domoe
         void register_cartridge(C cartridge)
         {
 
-            std::string command_name=cartridge.command_name;    
-            std::cout<<"command_name:"<< command_name<<std::endl;        
+            std::string command_name=cartridge.command_name;
+            std::cout<<"command_name:"<< command_name<<std::endl;
             if(cartridge_manager.count(command_name)){
                 std::cout<<"WARN: cartridge will be overwritten"<<std::endl;
             }
@@ -103,6 +109,9 @@ namespace MITSU_Domoe
 
             std::string description; // GUIに表示するコマンドの説明
         };
+
+        std::string resolve_refs(const std::string &input_json);
+
 
         std::map<std::string, Cartridge_info> cartridge_manager;
         // std::map<std::string, std::function<CommandResult(const std::string&)>> handlers_;

@@ -3,15 +3,17 @@
 #include <optional>
 #include <vector>
 
-// インクルードパスを新しい構成に合わせる
 #include <MITSUDomoe/CommandProcessor.hpp>
 #include <MITSUDomoe/ResultRepository.hpp>
+
+// All cartridges used in the test
+#include "ReadStlCartridge.hpp"
 #include "GenerateCentroidsCartridge_mock.hpp"
+#include "GenerateCentroidsCartridge.hpp"
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
-#include "ReadStlCartridge.hpp"
 
-// (関数の中身は前回と同じ)
+
 void print_result(uint64_t id, const std::optional<MITSU_Domoe::CommandResult> &result)
 {
     std::cout << "\nClient: Querying result for command ID " << id << "..." << std::endl;
@@ -22,72 +24,55 @@ void print_result(uint64_t id, const std::optional<MITSU_Domoe::CommandResult> &
     }
     if (const auto *success = std::get_if<MITSU_Domoe::SuccessResult>(&(*result)))
     {
-        std::cout << "  Task " << id << " Succeeded!" << std::endl;
-        std::cout << "  Raw Output json:\n"
-                  << success->output_json << std::endl;
-        auto output = rfl::json::read<GenerateCentroidsCartridge_mock::Output>(
-            success->output_json);
-        if (output)
-        {
-            std::cout << "  Deserialized Message: " << output->message << std::endl;
-        }
-        else
-        {
-            std::cout << "  Failed to deserialize success result." << std::endl;
-        }
+        std::cout << "  Task " << id << " (" << success->command_name << ") Succeeded!" << std::endl;
+        std::cout << "  Output json:\n" << success->output_json << std::endl;
     }
     else if (const auto *error = std::get_if<MITSU_Domoe::ErrorResult>(&(*result)))
     {
-        std::cout << "  Task " << id << " Failed! Reason: " << error->error_message
-                  << std::endl;
+        std::cout << "  Task " << id << " Failed! Reason: " << error->error_message << std::endl;
     }
 }
 
+void run_success_case(MITSU_Domoe::CommandProcessor& processor, const std::shared_ptr<MITSU_Domoe::ResultRepository>& repo) {
+    std::cout << "\n--- Test Case: Chaining commands with $ref (Success) ---" << std::endl;
+    const std::string read_stl_input = R"({"filepath": "sample/resource/tetra.stl"})";
+    uint64_t read_stl_id = processor.add_to_queue("readStl", read_stl_input);
+    const std::string generate_centroids_input =
+        R"({"input_polygon_mesh": "$ref:cmd[)" + std::to_string(read_stl_id) + R"(].polygon_mesh"})";
+    uint64_t generate_centroids_id = processor.add_to_queue("generateCentroids", generate_centroids_input);
+    processor.process_queue();
+    print_result(read_stl_id, repo->get_result(read_stl_id));
+    print_result(generate_centroids_id, repo->get_result(generate_centroids_id));
+}
+
+void run_type_mismatch_case(MITSU_Domoe::CommandProcessor& processor, const std::shared_ptr<MITSU_Domoe::ResultRepository>& repo) {
+    std::cout << "\n--- Test Case: Chaining commands with $ref (Type Mismatch) ---" << std::endl;
+    const std::string read_stl_input = R"({"filepath": "sample/resource/tetra.stl"})";
+    uint64_t read_stl_id = processor.add_to_queue("readStl", read_stl_input);
+
+    // Try to pass a polygon_mesh to a command expecting an unsigned int. This should fail.
+    const std::string bad_ref_input =
+        R"({"input_mesh_id": "$ref:cmd[)" + std::to_string(read_stl_id) + R"(].polygon_mesh"})";
+    uint64_t bad_ref_id = processor.add_to_queue("GenerateCentroids_mock", bad_ref_input);
+    processor.process_queue();
+    print_result(read_stl_id, repo->get_result(read_stl_id));
+    print_result(bad_ref_id, repo->get_result(bad_ref_id));
+}
+
+
 int main()
 {
-    // (中身は前回と同じ)
     auto result_repo = std::make_shared<MITSU_Domoe::ResultRepository>();
     MITSU_Domoe::CommandProcessor processor(result_repo);
-    // processor.register_cartridge("generateCentroids", GenerateCentroidsCartridge_mock{});
-    // processor.register_cartridge("BIGprocess_mock_cartridge",BIGprocess_mock_cartridge{});
-    // processor.register_cartridge("Need_many_arg_mock_cartridge", Need_many_arg_mock_cartridge{});
-    processor.register_cartridge(GenerateCentroidsCartridge_mock{});
 
-    processor.register_cartridge(BIGprocess_mock_cartridge{});
-
-    processor.register_cartridge(Need_many_arg_mock_cartridge{});
     processor.register_cartridge(ReadStlCartridge{});
-    std::cout << "\n--- Cartridge Schemas ---" << std::endl;
+    processor.register_cartridge(GenerateCentroidsCartridge_mock{});
+    processor.register_cartridge(GenerateCentroidsCartridge{});
+    processor.register_cartridge(BIGprocess_mock_cartridge{});
+    processor.register_cartridge(Need_many_arg_mock_cartridge{});
 
-    const std::string command_name = "GenerateCentroids_mock";
-    const std::string input_json1 = R"({"input_mesh_id":  101})";
-    const std::string input_json2 = R"({"input_mesh_id" : 202})";
-    const std::string command_name2 = "BIGprocess_mock";
-    const std::string read_stl_command = "readStl";
-    const std::string read_stl_input = R"({"filepath": "sample/resource/tetra.stl"})";
-
-    const std::string invalid_command = "nonExistentCommand";
-    const std::string invalid_json = R"({"invalid_field" : 999})";
-
-    std::cout << "\n--- Client adding commands to the queue ---" << std::endl;
-    uint64_t id1 = processor.add_to_queue(command_name, input_json1);
-    uint64_t id2 = processor.add_to_queue(command_name2, input_json2);
-    uint64_t id3 = processor.add_to_queue(invalid_command, input_json1);
-    uint64_t id4 = processor.add_to_queue(command_name2, invalid_json);
-    uint64_t id5 = processor.add_to_queue(command_name2, input_json1);
-    uint64_t id6 = processor.add_to_queue(read_stl_command, read_stl_input);
-
-    std::cout << "\nAll commands have been enqueued. No execution has happened yet." << std::endl;
-
-    processor.process_queue();
-
-    std::cout << "\n--- Client retrieving results from repository ---" << std::endl;
-    print_result(id1, result_repo->get_result(id1));
-    print_result(id2, result_repo->get_result(id2));
-    print_result(id3, result_repo->get_result(id3));
-    print_result(id4, result_repo->get_result(id4));
-    print_result(id5, result_repo->get_result(id5));
-    print_result(id6, result_repo->get_result(id6));
+    run_success_case(processor, result_repo);
+    run_type_mismatch_case(processor, result_repo);
 
     return 0;
 }

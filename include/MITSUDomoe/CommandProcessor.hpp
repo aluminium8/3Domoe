@@ -14,6 +14,12 @@
 #include <queue>
 #include <string>
 #include <any>
+#include <regex>
+#if __has_include(<yyjson.h>)
+#include <yyjson.h>
+#else
+#include "rfl/thirdparty/yyjson.h"
+#endif
 
 namespace MITSU_Domoe
 {
@@ -28,8 +34,8 @@ namespace MITSU_Domoe
         void register_cartridge(C cartridge)
         {
 
-            std::string command_name=cartridge.command_name;    
-            std::cout<<"command_name:"<< command_name<<std::endl;        
+            std::string command_name=cartridge.command_name;
+            std::cout<<"command_name:"<< command_name<<std::endl;
             if(cartridge_manager.count(command_name)){
                 std::cout<<"WARN: cartridge will be overwritten"<<std::endl;
             }
@@ -41,13 +47,14 @@ namespace MITSU_Domoe
             {
                 cartridge_manager[command_name].input_schema.arg_names_to_type[f.name()] = f.type();
             }
-            for (const auto &arg : cartridge_manager[command_name].input_schema.arg_names_to_type)
+
+            for (const auto &f : rfl::fields<typename C::Output>())
             {
-                std::cout << "name: " << arg.first << ", type: " << arg.second << std::endl;
+                cartridge_manager[command_name].output_schema[f.name()] = f.type();
             }
 
 
-            cartridge_manager[command_name].handler = [cartridge, command_name, this](const std::string &input_json) -> CommandResult
+            cartridge_manager[command_name].handler = [cartridge, command_name, this, output_schema = cartridge_manager[command_name].output_schema](const std::string &input_json) -> CommandResult
             {
                 try
                 {
@@ -65,6 +72,7 @@ namespace MITSU_Domoe
                     result_capsule.output_json = rfl::json::write(output_obj);
                     result_capsule.output_raw = output_obj;
                     result_capsule.command_name = command_name;
+                    result_capsule.output_schema = output_schema;
 
                     return result_capsule;
                 }
@@ -94,15 +102,15 @@ namespace MITSU_Domoe
         };
         struct Cartridge_info
         {
-            // 1. コマンドを実行するための関数 (従来のhandlers_の中身)
             std::function<CommandResult(const std::string &input_json)> handler;
-
-            // 2. このコマンドの出力からメンバーを抽出するための関数
             std::function<CommandResult(const std::any &source_output, const std::string &member_name)> extractor;
             Input_Schema input_schema;
-
-            std::string description; // GUIに表示するコマンドの説明
+            std::map<std::string, std::string> output_schema;
+            std::string description;
         };
+
+        std::string resolve_refs(const std::string &input_json, const std::string& command_name_of_current_cmd);
+
 
         std::map<std::string, Cartridge_info> cartridge_manager;
         // std::map<std::string, std::function<CommandResult(const std::string&)>> handlers_;

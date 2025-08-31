@@ -1,6 +1,6 @@
 #pragma once
 
-#include <eigen/Dense>
+#include <Eigen/Dense>
 
 namespace MITSU_Domoe
 {
@@ -8,7 +8,7 @@ namespace MITSU_Domoe
     {
         Eigen::MatrixXd V;
         Eigen::MatrixXi F;
-        Eigen::MatrixXd N; 
+        Eigen::MatrixXd N;
     };
     struct Polygon_clusters
     {

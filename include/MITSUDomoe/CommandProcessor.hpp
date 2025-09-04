@@ -99,6 +99,8 @@ namespace MITSU_Domoe
         void stop();
 
         std::map<std::string, std::string> get_cartridge_schemas() const;
+        std::vector<std::string> get_command_names() const;
+        std::map<std::string, std::string> get_input_schema(const std::string& command_name) const;
 
     private:
         void worker_loop();

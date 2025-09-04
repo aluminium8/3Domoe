@@ -42,6 +42,7 @@ find_package(Eigen3  CONFIG REQUIRED)
 find_package(libigl CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_package(OpenGL REQUIRED)
 find_package(glad CONFIG REQUIRED)
 # サブモジュールを追加 (テストとサンプルは不要なのでOFFにする)
 # add_subdirectory を呼び出す前に、サブディレクトリのオプションを設定
@@ -72,7 +73,7 @@ target_link_libraries(CommandProcessor PRIVATE spdlog::spdlog reflectcpp::reflec
 target_include_directories(CommandProcessor PRIVATE include)
 
 add_executable(main ./sample/main.cpp)
-target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes)
+target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes glfw glad::glad imgui::imgui OpenGL::GL)
 target_include_directories(main PRIVATE include)
 
 

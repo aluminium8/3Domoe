@@ -14,10 +14,11 @@ public:
     void store_result(uint64_t id, CommandResult result);
     std::optional<CommandResult> get_result(uint64_t id);
     bool remove_result(uint64_t id);
+    std::map<uint64_t, CommandResult> get_all_results() const;
 
 private:
     std::map<uint64_t, CommandResult> results_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
 };
 
 } // namespace MITSU_Domoe

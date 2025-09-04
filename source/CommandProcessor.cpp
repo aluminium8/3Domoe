@@ -174,4 +174,25 @@ namespace MITSU_Domoe
         return id;
     }
 
+    std::vector<std::string> CommandProcessor::get_command_names() const
+    {
+        std::vector<std::string> names;
+        names.reserve(cartridge_manager.size());
+        for (const auto &pair : cartridge_manager)
+        {
+            names.push_back(pair.first);
+        }
+        return names;
+    }
+
+    std::map<std::string, std::string> CommandProcessor::get_input_schema(const std::string& command_name) const
+    {
+        auto it = cartridge_manager.find(command_name);
+        if (it != cartridge_manager.end())
+        {
+            return it->second.input_schema.arg_names_to_type;
+        }
+        return {};
+    }
+
 } // namespace MITSU_Domoe

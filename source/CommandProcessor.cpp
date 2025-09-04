@@ -8,6 +8,55 @@ namespace MITSU_Domoe
     CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo)
         : result_repo_(std::move(repo)) {}
 
+    CommandProcessor::~CommandProcessor()
+    {
+        stop();
+    }
+
+    void CommandProcessor::start()
+    {
+        worker_thread_ = std::thread(&CommandProcessor::worker_loop, this);
+    }
+
+    void CommandProcessor::stop()
+    {
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex_);
+            stop_flag_ = true;
+        }
+        condition_.notify_one();
+        if (worker_thread_.joinable())
+        {
+            worker_thread_.join();
+        }
+    }
+
+    void CommandProcessor::worker_loop()
+    {
+        while (true)
+        {
+            std::pair<uint64_t, std::function<CommandResult()>> task_pair;
+            {
+                std::unique_lock<std::mutex> lock(queue_mutex_);
+                condition_.wait(lock, [this] { return !command_queue_.empty() || stop_flag_; });
+
+                if (stop_flag_ && command_queue_.empty())
+                {
+                    return;
+                }
+
+                task_pair = std::move(command_queue_.front());
+                command_queue_.pop();
+            }
+
+            auto& [id, task] = task_pair;
+            std::cout << "Executing command with ID " << id << "..." << std::endl;
+            CommandResult result = task();
+            result_repo_->store_result(id, std::move(result));
+            std::cout << "Result for command ID " << id << " stored." << std::endl << std::endl;
+        }
+    }
+
     std::string CommandProcessor::resolve_refs(const std::string &input_json, const std::string& command_name_of_current_cmd)
     {
         const std::regex ref_regex(R"(\$ref:cmd\[(\d+)\]\.(\w+))");
@@ -114,27 +163,15 @@ namespace MITSU_Domoe
             };
         }
 
-        command_queue_.emplace(id, std::move(task_logic));
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex_);
+            command_queue_.emplace(id, std::move(task_logic));
+        }
+        condition_.notify_one();
+
         std::cout << "Command '" << command_name << "' with ID " << id
                   << " added to the queue." << std::endl;
         return id;
-    }
-
-    void CommandProcessor::process_queue()
-    {
-        std::cout << "\n--- Processing command queue (" << command_queue_.size()
-                  << " commands) ---" << std::endl;
-        while (!command_queue_.empty())
-        {
-            auto [id, task] = std::move(command_queue_.front());
-            command_queue_.pop();
-            std::cout << "Executing command with ID " << id << "..." << std::endl;
-            CommandResult result = task();
-            result_repo_->store_result(id, std::move(result));
-            std::cout << "Result for command ID " << id << " stored." << std::endl
-                      << std::endl;
-        }
-        std::cout << "--- Command queue processed ---" << std::endl;
     }
 
 } // namespace MITSU_Domoe

@@ -105,3 +105,7 @@ target_link_libraries(_old_glfw_eigen3_draw_test_from_libigl PRIVATE spdlog::spd
 
 #add_executable(_old_input_type_register_test ./old_command_pattern/input_type_register_test.cpp)
 #target_link_libraries(_old_input_type_register_test PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui igl::igl_core  rfl_eigen_serdes)
+
+add_executable(gui_client ./sample/gui_main.cpp)
+target_link_libraries(gui_client PRIVATE CommandProcessor ResultRepository spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  glfw glad::glad imgui::imgui rfl_eigen_serdes)
+target_include_directories(gui_client PRIVATE include)

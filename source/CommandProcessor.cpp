@@ -151,7 +151,7 @@ namespace MITSU_Domoe
                     const std::string resolved_input_json = this->resolve_refs(input_json, command_name);
                     return handler(resolved_input_json);
                 } catch (const std::exception& e) {
-                    return CommandResult(ErrorResult{"Error during reference resolution: " + std::string(e.what())});
+                    return CommandResult(ErrorResult{command_name, "Error during reference resolution: " + std::string(e.what())});
                 }
             };
         }
@@ -159,7 +159,7 @@ namespace MITSU_Domoe
         {
             task_logic = [command_name]
             {
-                return ErrorResult{"Error: Command '" + command_name + "' not found."};
+                return ErrorResult{command_name, "Error: Command '" + command_name + "' not found."};
             };
         }
 
@@ -172,6 +172,19 @@ namespace MITSU_Domoe
         std::cout << "Command '" << command_name << "' with ID " << id
                   << " added to the queue." << std::endl;
         return id;
+    }
+
+    std::vector<std::string> CommandProcessor::get_registered_command_names() const {
+        std::vector<std::string> names;
+        names.reserve(cartridge_manager.size());
+        for (const auto& pair : cartridge_manager) {
+            names.push_back(pair.first);
+        }
+        return names;
+    }
+
+    uint64_t CommandProcessor::get_next_command_id() const {
+        return next_command_id_.load();
     }
 
 } // namespace MITSU_Domoe

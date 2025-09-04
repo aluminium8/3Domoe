@@ -84,6 +84,7 @@ namespace MITSU_Domoe
                 catch (const std::exception &e)
                 {
                     return ErrorResult{
+                        command_name,
                         "An exception occurred during command execution: " +
                         std::string(e.what())};
                 }
@@ -97,6 +98,9 @@ namespace MITSU_Domoe
         uint64_t add_to_queue(const std::string &command_name, const std::string &input_json);
         void start();
         void stop();
+
+        std::vector<std::string> get_registered_command_names() const;
+        uint64_t get_next_command_id() const;
 
         std::map<std::string, std::string> get_cartridge_schemas() const;
 

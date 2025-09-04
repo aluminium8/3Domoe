@@ -33,6 +33,7 @@ struct SuccessResult {
     std::map<std::string, std::string> output_schema;
 };
 struct ErrorResult {
+    std::string command_name;
     std::string error_message;
 };
 using CommandResult = std::variant<SuccessResult, ErrorResult>;

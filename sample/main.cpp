@@ -3,6 +3,7 @@
 #include <imgui_impl_opengl3.h>
 #include <stdio.h>
 #include <sstream>
+#include <cstring>
 
 #include <glad/glad.h>
 
@@ -143,9 +144,27 @@ int main(int, char**)
                         if (!first) {
                             json_stream << ",";
                         }
-                        // Note: This simple serialization wraps everything in quotes.
-                        // The backend needs to be robust enough to handle this.
-                        json_stream << "\"" << pair.first << "\":\"" << pair.second.data() << "\"";
+
+                        const std::string& arg_name = pair.first;
+                        const char* arg_value = pair.second.data();
+                        const std::string& arg_type = current_schema[arg_name];
+
+                        json_stream << "\"" << arg_name << "\":";
+
+                        // Only add quotes for string-like types
+                        if (arg_type.find("string") != std::string::npos || arg_type.find("path") != std::string::npos) {
+                            json_stream << "\"" << arg_value << "\"";
+                        } else { // For numbers, bools, etc., output raw value
+                            if (strlen(arg_value) == 0) {
+                                if (arg_type == "bool") {
+                                    json_stream << "false";
+                                } else {
+                                    json_stream << "0";
+                                }
+                            } else {
+                                json_stream << arg_value;
+                            }
+                        }
                         first = false;
                     }
                     json_stream << "}";

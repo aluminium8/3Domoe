@@ -15,6 +15,10 @@
 #include <string>
 #include <any>
 #include <regex>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
 #if __has_include(<yyjson.h>)
 #include <yyjson.h>
 #else
@@ -29,6 +33,7 @@ namespace MITSU_Domoe
     {
     public:
         CommandProcessor(std::shared_ptr<ResultRepository> repo);
+        ~CommandProcessor();
 
         template <Cartridge C>
         void register_cartridge(C cartridge)
@@ -90,11 +95,13 @@ namespace MITSU_Domoe
         }
 
         uint64_t add_to_queue(const std::string &command_name, const std::string &input_json);
-        void process_queue();
+        void start();
+        void stop();
 
         std::map<std::string, std::string> get_cartridge_schemas() const;
 
     private:
+        void worker_loop();
         // CommandProcessorの内部クラスとして定義すると良い
         struct Input_Schema
         {
@@ -117,6 +124,11 @@ namespace MITSU_Domoe
         std::queue<std::pair<uint64_t, std::function<CommandResult()>>> command_queue_;
         std::atomic<uint64_t> next_command_id_{1};
         std::shared_ptr<ResultRepository> result_repo_;
+
+        std::thread worker_thread_;
+        std::mutex queue_mutex_;
+        std::condition_variable condition_;
+        std::atomic<bool> stop_flag_{false};
     };
 
 } // namespace MITSU_Domoe

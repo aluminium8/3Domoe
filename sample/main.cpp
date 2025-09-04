@@ -2,6 +2,8 @@
 #include <memory>
 #include <optional>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 #include <MITSUDomoe/CommandProcessor.hpp>
 #include <MITSUDomoe/ResultRepository.hpp>
@@ -40,7 +42,9 @@ void run_success_case(MITSU_Domoe::CommandProcessor& processor, const std::share
     const std::string generate_centroids_input =
         R"({"input_polygon_mesh": "$ref:cmd[)" + std::to_string(read_stl_id) + R"(].polygon_mesh"})";
     uint64_t generate_centroids_id = processor.add_to_queue("generateCentroids", generate_centroids_input);
-    processor.process_queue();
+
+    // Wait for commands to be processed
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     print_result(read_stl_id, repo->get_result(read_stl_id));
     print_result(generate_centroids_id, repo->get_result(generate_centroids_id));
 }
@@ -54,9 +58,28 @@ void run_type_mismatch_case(MITSU_Domoe::CommandProcessor& processor, const std:
     const std::string bad_ref_input =
         R"({"input_mesh_id": "$ref:cmd[)" + std::to_string(read_stl_id) + R"(].polygon_mesh"})";
     uint64_t bad_ref_id = processor.add_to_queue("GenerateCentroids_mock", bad_ref_input);
-    processor.process_queue();
+
+    // Wait for commands to be processed
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     print_result(read_stl_id, repo->get_result(read_stl_id));
     print_result(bad_ref_id, repo->get_result(bad_ref_id));
+}
+
+void run_async_case(MITSU_Domoe::CommandProcessor& processor, const std::shared_ptr<MITSU_Domoe::ResultRepository>& repo) {
+    std::cout << "\n--- Test Case: Asynchronous command execution ---" << std::endl;
+    const std::string big_process_input = R"({"time_to_process": 5})";
+    uint64_t big_process_id = processor.add_to_queue("BIGprocess_mock", big_process_input);
+    std::cout << "Main thread: BIGprocess_mock_cartridge added to queue. Main thread is NOT blocked." << std::endl;
+
+    while(true) {
+        auto result = repo->get_result(big_process_id);
+        if (result) {
+            print_result(big_process_id, result);
+            break;
+        }
+        std::cout << "Main thread: Waiting for BIGprocess_mock_cartridge to finish..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }
 
 
@@ -71,8 +94,14 @@ int main()
     processor.register_cartridge(BIGprocess_mock_cartridge{});
     processor.register_cartridge(Need_many_arg_mock_cartridge{});
 
+    processor.start();
+
     run_success_case(processor, result_repo);
     run_type_mismatch_case(processor, result_repo);
+    run_async_case(processor, result_repo);
+
+    std::cout << "Main thread: All test cases finished. Stopping processor." << std::endl;
+    processor.stop();
 
     return 0;
 }

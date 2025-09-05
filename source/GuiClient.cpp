@@ -241,12 +241,17 @@ void GuiClient::main_loop()
                     selected_result_id = id;
                     if (const auto* success = std::get_if<MITSU_Domoe::SuccessResult>(&result)) {
                         result_json_output = success->output_json;
-                        try {
-                            const auto& mesh = std::any_cast<const Polygon_mesh&>(success->output_raw);
-                            model_renderer = std::make_unique<ModelRenderer>(mesh);
-                            std::cout << "Successfully created ModelRenderer for the selected mesh." << std::endl;
-                        } catch (const std::bad_any_cast& e) {
-                            std::cout << "Selected result is not a Polygon_mesh, clearing renderer." << std::endl;
+                        if (success->command_name == "readStl") {
+                            try {
+                                const auto& stl_output = std::any_cast<const ReadStlCartridge::Output&>(success->output_raw);
+                                model_renderer = std::make_unique<ModelRenderer>(stl_output.polygon_mesh);
+                                std::cout << "Successfully created ModelRenderer for the selected STL mesh." << std::endl;
+                            } catch (const std::bad_any_cast& e) {
+                                std::cout << "Cast failed for readStl output. " << e.what() << std::endl;
+                                model_renderer.reset();
+                            }
+                        } else {
+                            std::cout << "Selected result is not from readStl, clearing renderer." << std::endl;
                             model_renderer.reset();
                         }
                     } else if (const auto* error = std::get_if<MITSU_Domoe::ErrorResult>(&result)) {

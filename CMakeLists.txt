@@ -73,7 +73,7 @@ target_link_libraries(CommandProcessor PUBLIC spdlog::spdlog reflectcpp::reflect
 target_include_directories(CommandProcessor PUBLIC include)
 
 # Create a library for the client code
-add_library(ClientLib source/BaseClient.cpp source/ConsoleClient.cpp source/GuiClient.cpp)
+add_library(ClientLib source/BaseClient.cpp source/ConsoleClient.cpp source/GuiClient.cpp source/Shader.cpp source/Camera.cpp source/RenderableMesh.cpp)
 target_include_directories(ClientLib PUBLIC include sample)
 target_link_libraries(ClientLib PUBLIC
     spdlog::spdlog

@@ -65,20 +65,36 @@ add_subdirectory(external/rfl_eigen_serdes EXCLUDE_FROM_ALL)
 
 
 add_library(ResultRepository source/ResultRepository.cpp)
-target_link_libraries(ResultRepository PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
-target_include_directories(ResultRepository PRIVATE include)
+target_link_libraries(ResultRepository PUBLIC spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen  )
+target_include_directories(ResultRepository PUBLIC include)
 
 add_library(CommandProcessor source/CommandProcessor.cpp)
-target_link_libraries(CommandProcessor PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository )
-target_include_directories(CommandProcessor PRIVATE include)
+target_link_libraries(CommandProcessor PUBLIC spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository )
+target_include_directories(CommandProcessor PUBLIC include)
 
+# Create a library for the client code
+add_library(ClientLib source/BaseClient.cpp source/ConsoleClient.cpp source/GuiClient.cpp)
+target_include_directories(ClientLib PUBLIC include sample)
+target_link_libraries(ClientLib PUBLIC
+    spdlog::spdlog
+    reflectcpp::reflectcpp
+    Eigen3::Eigen
+    ResultRepository
+    CommandProcessor
+    rfl_eigen_serdes
+    glfw
+    glad::glad
+    imgui::imgui
+    OpenGL::GL
+)
+
+# Link the executables to the client library
 add_executable(GUImain ./sample/GUImain.cpp)
-target_link_libraries(GUImain PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes glfw glad::glad imgui::imgui OpenGL::GL)
+target_link_libraries(GUImain PRIVATE ClientLib)
 target_include_directories(GUImain PRIVATE include)
 
-
 add_executable(CLImain ./sample/CLImain.cpp)
-target_link_libraries(CLImain PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes glfw glad::glad imgui::imgui OpenGL::GL)
+target_link_libraries(CLImain PRIVATE ClientLib)
 target_include_directories(CLImain PRIVATE include)
 
 

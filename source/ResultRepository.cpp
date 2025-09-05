@@ -21,4 +21,9 @@ bool ResultRepository::remove_result(uint64_t id) {
     return results_.erase(id) > 0;
 }
 
+std::map<uint64_t, CommandResult> ResultRepository::get_all_results() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return results_;
+}
+
 } // namespace MITSU_Domoe

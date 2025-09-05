@@ -44,6 +44,7 @@ find_package(imgui CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(glad CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
 # サブモジュールを追加 (テストとサンプルは不要なのでOFFにする)
 # add_subdirectory を呼び出す前に、サブディレクトリのオプションを設定
 set(BUILD_TESTS OFF CACHE BOOL "Disable tests for rfl_eigen_serdes" FORCE)
@@ -73,7 +74,7 @@ target_link_libraries(CommandProcessor PUBLIC spdlog::spdlog reflectcpp::reflect
 target_include_directories(CommandProcessor PUBLIC include)
 
 # Create a library for the client code
-add_library(ClientLib source/BaseClient.cpp source/ConsoleClient.cpp source/GuiClient.cpp)
+add_library(ClientLib source/BaseClient.cpp source/ConsoleClient.cpp source/GuiClient.cpp source/Shader.cpp source/ModelRenderer.cpp)
 target_include_directories(ClientLib PUBLIC include sample)
 target_link_libraries(ClientLib PUBLIC
     spdlog::spdlog
@@ -86,6 +87,7 @@ target_link_libraries(ClientLib PUBLIC
     glad::glad
     imgui::imgui
     OpenGL::GL
+    glm::glm
 )
 
 # Link the executables to the client library

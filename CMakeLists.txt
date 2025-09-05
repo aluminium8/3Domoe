@@ -72,11 +72,14 @@ add_library(CommandProcessor source/CommandProcessor.cpp)
 target_link_libraries(CommandProcessor PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository )
 target_include_directories(CommandProcessor PRIVATE include)
 
-add_executable(main ./sample/main.cpp)
-target_link_libraries(main PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes glfw glad::glad imgui::imgui OpenGL::GL)
-target_include_directories(main PRIVATE include)
+add_executable(GUImain ./sample/GUImain.cpp)
+target_link_libraries(GUImain PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes glfw glad::glad imgui::imgui OpenGL::GL)
+target_include_directories(GUImain PRIVATE include)
 
 
+add_executable(CLImain ./sample/CLImain.cpp)
+target_link_libraries(CLImain PRIVATE spdlog::spdlog reflectcpp::reflectcpp Eigen3::Eigen ResultRepository CommandProcessor rfl_eigen_serdes glfw glad::glad imgui::imgui OpenGL::GL)
+target_include_directories(CLImain PRIVATE include)
 
 
 

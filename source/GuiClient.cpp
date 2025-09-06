@@ -62,8 +62,20 @@ namespace MITSU_Domoe
                     auto output = rfl::json::read<ReadStlCartridge::Output>(success->output_json);
                     if (output)
                     {
-                        mesh_render_states[id] = MeshRenderState{
-                            .renderer = std::make_unique<Renderer>(output->polygon_mesh)};
+                        const auto& mesh = output->polygon_mesh;
+                        Eigen::Vector3d min_bound = mesh.V.colwise().minCoeff();
+                        Eigen::Vector3d max_bound = mesh.V.colwise().maxCoeff();
+                        Eigen::Vector3d center = (min_bound + max_bound) / 2.0;
+                        double radius = (max_bound - min_bound).norm() / 2.0;
+
+                        MeshRenderState state;
+                        state.renderer = std::make_unique<Renderer>(mesh);
+                        state.camera_target = center.cast<float>();
+                        state.distance = radius * 2.5f;
+                        state.near_clip = 0.01f * radius;
+                        state.far_clip = 10.0f * radius;
+
+                        mesh_render_states[id] = std::move(state);
                     }
                 }
             }
@@ -279,35 +291,26 @@ namespace MITSU_Domoe
 
                         if (root)
                         {
-                            // 3列のテーブルを開始 // MODIFIED: 2 -> 3
                             if (ImGui::BeginTable("result_table", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
                             {
-                                // テーブルのヘッダー
                                 ImGui::TableSetupColumn("Field");
                                 ImGui::TableSetupColumn("Value");
-                                ImGui::TableSetupColumn("Reference", ImGuiTableColumnFlags_WidthFixed); // ADDED: 3列目のヘッダー
+                                ImGui::TableSetupColumn("Reference", ImGuiTableColumnFlags_WidthFixed);
                                 ImGui::TableHeadersRow();
 
-                                // result_schemaをループして各行を生成
                                 for (const auto &pair : result_schema)
                                 {
                                     const std::string &name = pair.first;
                                     const std::string &type = pair.second;
-
                                     yyjson_val *value_val = yyjson_obj_get(root, name.c_str());
-
                                     if (value_val)
                                     {
                                         const char *value_str = yyjson_val_write(value_val, 0, NULL);
                                         if (value_str)
                                         {
-                                            ImGui::TableNextRow(); // 新しい行
-
-                                            // 1列目: フィールド名 + 型名
+                                            ImGui::TableNextRow();
                                             ImGui::TableSetColumnIndex(0);
                                             ImGui::TextUnformatted((name + "\n [" + type + "]").c_str());
-
-                                            // 2列目: 値 (折り返しあり、クリックで値自体をコピー)
                                             ImGui::TableSetColumnIndex(1);
                                             ImGui::PushID(name.c_str());
                                             ImGui::TextWrapped("%s", value_str);
@@ -317,20 +320,14 @@ namespace MITSU_Domoe
                                                 ImGui::OpenPopup("CopiedPopup");
                                             }
                                             ImGui::PopID();
-
-                                            // ADDED: 3列目: 参照構文を生成するボタン
                                             ImGui::TableSetColumnIndex(2);
-                                            std::string button_label = "Ref##" + name; // ボタンのIDをユニークにする
+                                            std::string button_label = "Ref##" + name;
                                             if (ImGui::Button(button_label.c_str()))
                                             {
-                                                // $ref:cmd[id].member の形式で文字列を生成
                                                 std::string ref_syntax = "$ref:cmd[" + std::to_string(selected_result_id) + "]." + name;
-                                                // クリップボードにコピー
                                                 ImGui::SetClipboardText(ref_syntax.c_str());
                                                 ImGui::OpenPopup("CopiedPopup");
                                             }
-                                            // END ADDED
-
                                             free((void *)value_str);
                                         }
                                     }
@@ -341,10 +338,8 @@ namespace MITSU_Domoe
                                     ImGui::TableSetColumnIndex(0);
                                     ImGui::Text("Render");
                                     ImGui::TableSetColumnIndex(1);
-
                                     auto &state = mesh_render_states.at(selected_result_id);
                                     ImGui::Checkbox("Visible", &state.is_visible);
-
                                     std::string shader_names_str;
                                     std::vector<std::string> shader_names_vec;
                                     for (const auto &pair : shader_manager.Shaders)
@@ -352,7 +347,6 @@ namespace MITSU_Domoe
                                         shader_names_str += pair.first + '\0';
                                         shader_names_vec.push_back(pair.first);
                                     }
-
                                     int current_shader_idx = -1;
                                     for (int i = 0; i < shader_names_vec.size(); ++i)
                                     {
@@ -362,13 +356,12 @@ namespace MITSU_Domoe
                                             break;
                                         }
                                     }
-
                                     if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str()))
                                     {
                                         state.selected_shader_name = shader_names_vec[current_shader_idx];
                                     }
                                 }
-                                ImGui::EndTable(); // テーブルを終了
+                                ImGui::EndTable();
                             }
                         }
                         yyjson_doc_free(doc);
@@ -393,15 +386,53 @@ namespace MITSU_Domoe
             // Camera/View transformation
             Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
             Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
-
-            // lookAt
-            view.block<3, 3>(0, 0) = (Eigen::AngleAxisf(yaw, Eigen::Vector3f::UnitY()) * Eigen::AngleAxisf(pitch, Eigen::Vector3f::UnitX())).toRotationMatrix();
-            view.block<3, 1>(0, 3) = -view.block<3, 3>(0, 0) * cameraPos;
-
-            // perspective
-            float aspect = (float)display_w / (float)display_h;
+            Eigen::Vector3f current_camera_pos = cameraPos;
+            Eigen::Vector3f current_camera_target = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
             float near = 0.1f;
             float far = 100.0f;
+
+            if (mesh_render_states.count(selected_result_id))
+            {
+                auto& state = mesh_render_states.at(selected_result_id);
+                if (!io.WantCaptureMouse)
+                {
+                    if (io.MouseWheel != 0.0f)
+                    {
+                        state.distance -= io.MouseWheel * 0.1f * state.distance;
+                        if (state.distance < 0.1f) state.distance = 0.1f;
+                    }
+
+                    if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                    {
+                        ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+                        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
+                        state.yaw -= delta.x * 0.25f;
+                        state.pitch -= delta.y * 0.25f;
+                        if (state.pitch > 89.0f) state.pitch = 89.0f;
+                        if (state.pitch < -89.0f) state.pitch = -89.0f;
+                    }
+                }
+
+                current_camera_target = state.camera_target;
+                near = state.near_clip;
+                far = state.far_clip;
+
+                Eigen::Vector3f dir;
+                dir.x() = cos(state.yaw * M_PI / 180.0f) * cos(state.pitch * M_PI / 180.0f);
+                dir.y() = sin(state.pitch * M_PI / 180.0f);
+                dir.z() = sin(state.yaw * M_PI / 180.0f) * cos(state.pitch * M_PI / 180.0f);
+                current_camera_pos = state.camera_target - dir.normalized() * state.distance;
+
+                Eigen::Vector3f z_axis = (current_camera_pos - current_camera_target).normalized();
+                Eigen::Vector3f x_axis = cameraUp.cross(z_axis).normalized();
+                Eigen::Vector3f y_axis = z_axis.cross(x_axis);
+                view(0,0) = x_axis.x(); view(0,1) = x_axis.y(); view(0,2) = x_axis.z(); view(0,3) = -x_axis.dot(current_camera_pos);
+                view(1,0) = y_axis.x(); view(1,1) = y_axis.y(); view(1,2) = y_axis.z(); view(1,3) = -y_axis.dot(current_camera_pos);
+                view(2,0) = z_axis.x(); view(2,1) = z_axis.y(); view(2,2) = z_axis.z(); view(2,3) = -z_axis.dot(current_camera_pos);
+                view(3,0) = 0; view(3,1) = 0; view(3,2) = 0; view(3,3) = 1.0f;
+            }
+
+            float aspect = (float)display_w / (float)display_h;
             float top = near * tan(fov * 0.5f * M_PI / 180.0f);
             float bottom = -top;
             float right = top * aspect;

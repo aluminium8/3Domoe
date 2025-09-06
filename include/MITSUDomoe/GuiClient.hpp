@@ -15,7 +15,15 @@ struct MeshRenderState
 {
     std::unique_ptr<Renderer> renderer;
     bool is_visible = true;
-    std::string selected_shader_name = "edge";
+    std::string selected_shader_name = "barycentric_wireframe";
+
+    // Camera state
+    Eigen::Vector3f camera_target;
+    float distance;
+    float yaw = -90.0f;
+    float pitch = 0.0f;
+    float near_clip;
+    float far_clip;
 };
 
 

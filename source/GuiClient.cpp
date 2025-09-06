@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <sstream>
 #include <cstring>
+#include "yyjson.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -78,6 +79,7 @@ void GuiClient::run()
     static std::map<std::string, std::vector<char>> arg_inputs;
     static uint64_t selected_result_id = 0;
     static std::string result_json_output;
+    static std::map<std::string, std::string> result_schema;
 
     auto update_form_state = [&](const std::string& command_name) {
         current_schema = get_input_schema(command_name);
@@ -171,8 +173,10 @@ void GuiClient::run()
                     selected_result_id = id;
                     if (const auto* success = std::get_if<MITSU_Domoe::SuccessResult>(&result)) {
                         result_json_output = success->output_json;
+                        result_schema = success->output_schema;
                     } else if (const auto* error = std::get_if<MITSU_Domoe::ErrorResult>(&result)) {
                         result_json_output = "Error: " + error->error_message;
+                        result_schema.clear();
                     }
                 }
             }
@@ -181,8 +185,36 @@ void GuiClient::run()
             ImGui::SameLine();
 
             ImGui::BeginChild("ResultJsonView", ImVec2(0, 0), true);
-            ImGui::Text("Result JSON:");
-            ImGui::TextWrapped("%s", result_json_output.c_str());
+            ImGui::Text("Result:");
+            if (selected_result_id != 0) {
+                if (result_schema.empty()) {
+                    ImGui::TextWrapped("%s", result_json_output.c_str());
+                } else {
+                    yyjson_doc *doc = yyjson_read(result_json_output.c_str(), result_json_output.length(), 0);
+                    yyjson_val *root = yyjson_doc_get_root(doc);
+
+                    if (root) {
+                        for (const auto& pair : result_schema) {
+                            const std::string& name = pair.first;
+                            const std::string& type = pair.second;
+
+                            yyjson_val *value_val = yyjson_obj_get(root, name.c_str());
+
+                            if (value_val) {
+                                const char* value_str = yyjson_val_write(value_val, 0, NULL);
+                                if (value_str) {
+                                    ImGui::Text("%s [%s]:", name.c_str(), type.c_str());
+                                    ImGui::SameLine();
+                                    ImGui::TextWrapped("%s", value_str);
+                                    free((void*)value_str);
+                                }
+                            }
+                        }
+                    }
+
+                    yyjson_doc_free(doc);
+                }
+            }
             ImGui::EndChild();
 
             ImGui::End();

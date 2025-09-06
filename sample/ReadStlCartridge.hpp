@@ -22,6 +22,7 @@ public:
     struct Output
     {
         MITSU_Domoe::Polygon_mesh polygon_mesh;
+        std::string filepath;
         std::string message;
     };
 
@@ -45,6 +46,7 @@ public:
         output.polygon_mesh.V = std::move(V);
         output.polygon_mesh.F = std::move(F);
         output.polygon_mesh.N = std::move(N);
+        output.filepath=input.filepath;
         output.message = "Successfully read STL file: " + input.filepath;
         return output;
     }

@@ -314,7 +314,20 @@ namespace MITSU_Domoe
                                             ImGui::TextUnformatted((name + "\n [" + type + "]").c_str());
                                             ImGui::TableSetColumnIndex(1);
                                             ImGui::PushID(name.c_str());
-                                            ImGui::TextWrapped("%s", value_str);
+
+                                            const size_t max_display_length = 256;
+                                            std::string display_str = value_str; // 表示用の文字列を準備
+
+                                            // もし元の文字列が256文字より長ければ
+                                            if (strlen(value_str) > max_display_length)
+                                            {
+                                                // 表示用文字列を256文字で切り取り、末尾に "..." を追加
+                                                display_str = std::string(value_str, max_display_length) + "...";
+                                            }
+
+                                            // 加工した表示用文字列を描画
+                                            ImGui::TextWrapped("%s", display_str.c_str());
+
                                             if (ImGui::IsItemClicked())
                                             {
                                                 ImGui::SetClipboardText(value_str);

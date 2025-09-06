@@ -1,7 +1,7 @@
 #include <MITSUDomoe/CommandProcessor.hpp>
 #include <iostream>
 #include <regex>
-
+#include <spdlog/spdlog.h>
 namespace MITSU_Domoe
 {
 
@@ -38,7 +38,8 @@ namespace MITSU_Domoe
             std::pair<uint64_t, std::function<CommandResult()>> task_pair;
             {
                 std::unique_lock<std::mutex> lock(queue_mutex_);
-                condition_.wait(lock, [this] { return !command_queue_.empty() || stop_flag_; });
+                condition_.wait(lock, [this]
+                                { return !command_queue_.empty() || stop_flag_; });
 
                 if (stop_flag_ && command_queue_.empty())
                 {
@@ -49,95 +50,146 @@ namespace MITSU_Domoe
                 command_queue_.pop();
             }
 
-            auto& [id, task] = task_pair;
+            auto &[id, task] = task_pair;
             std::cout << "Executing command with ID " << id << "..." << std::endl;
             CommandResult result = task();
             result_repo_->store_result(id, std::move(result));
-            std::cout << "Result for command ID " << id << " stored." << std::endl << std::endl;
+            std::cout << "Result for command ID " << id << " stored." << std::endl
+                      << std::endl;
         }
     }
 
-    std::string CommandProcessor::resolve_refs(const std::string &input_json, const std::string& command_name_of_current_cmd)
+    std::string CommandProcessor::resolve_refs(const std::string &input_json, const std::string &command_name_of_current_cmd)
     {
+        spdlog::debug("Starting reference resolution for: {}", input_json);
+
         const std::regex ref_regex(R"(\$ref:cmd\[(\d+)\]\.(\w+))");
         auto resolved_json = input_json;
 
-        // This is a simplified search for the key. It assumes one ref per JSON.
-        // A more robust solution would parse the JSON and traverse the DOM.
-        const std::regex key_finder_regex(R"(\"(\w+)\"\s*:\s*\"\$ref:cmd)");
+        const std::regex key_finder_regex(R"("\"(\w+)\"\s*:\s*\"?\$ref:cmd)"); // MODIFIED: `"`をオプショナルに
         std::smatch key_match;
         std::string key_of_ref_field;
-        if(std::regex_search(input_json, key_match, key_finder_regex) && key_match.size() > 1) {
+        if (std::regex_search(input_json, key_match, key_finder_regex) && key_match.size() > 1)
+        {
             key_of_ref_field = key_match[1].str();
         }
 
         std::smatch match;
-        while (std::regex_search(resolved_json, match, ref_regex))
+        // NOTE: この実装はJSON内に複数の$refがある場合、正しく動作しない可能性がある
+        //       regex_searchは文字列の先頭から検索するため、置換によって文字列長が変わると
+        //       後続の検索に影響が出る。今回は$refが1つと仮定する。
+        if (std::regex_search(resolved_json, match, ref_regex))
         {
             const std::string full_match_str = match[0].str();
             const uint64_t cmd_id = std::stoull(match[1].str());
             const std::string member_name = match[2].str();
+            spdlog::debug("Found reference: {}, cmd_id={}, member={}", full_match_str, cmd_id, member_name);
 
             // Type Checking Logic
-            if (!key_of_ref_field.empty()) {
-                const auto& current_cartridge_info = cartridge_manager.at(command_name_of_current_cmd);
-                const auto& expected_type = current_cartridge_info.input_schema.arg_names_to_type.at(key_of_ref_field);
+            if (!key_of_ref_field.empty())
+            {
+                // (この部分は変更なし)
+                spdlog::debug("Performing type check for field '{}'...", key_of_ref_field);
+                const auto &current_cartridge_info = cartridge_manager.at(command_name_of_current_cmd);
+                const auto &expected_type = current_cartridge_info.input_schema.arg_names_to_type.at(key_of_ref_field);
 
                 auto referenced_result = result_repo_->get_result(cmd_id);
-                if(referenced_result) {
-                    auto success_result = std::get_if<SuccessResult>(&(*referenced_result));
-                    if(success_result) {
-                        const auto& actual_type = success_result->output_schema.at(member_name);
-                        if (expected_type != actual_type) {
-                            throw std::runtime_error("Type mismatch for field '" + key_of_ref_field + "'. Expected " + expected_type + " but got " + actual_type + ".");
-                        }
+                if (referenced_result && std::holds_alternative<SuccessResult>(*referenced_result))
+                {
+                    const auto &success_result = std::get<SuccessResult>(*referenced_result);
+                    const auto &actual_type = success_result.output_schema.at(member_name);
+                    if (expected_type != actual_type)
+                    {
+                        throw std::runtime_error("Type mismatch for field '" + key_of_ref_field + "'. Expected " + expected_type + " but got " + actual_type + ".");
                     }
+                    spdlog::debug("Type check passed. Expected '{}', got '{}'", expected_type, actual_type);
                 }
             }
 
-
             auto result = result_repo_->get_result(cmd_id);
-            if (!result) {
+            if (!result)
+            {
                 throw std::runtime_error("Referenced command with ID " + std::to_string(cmd_id) + " not found.");
             }
+            spdlog::debug("Successfully retrieved result for command ID {}", cmd_id);
 
             auto success_result = std::get_if<SuccessResult>(&(*result));
-            if (!success_result) {
+            if (!success_result)
+            {
                 throw std::runtime_error("Referenced command with ID " + std::to_string(cmd_id) + " failed.");
             }
 
             yyjson_doc *doc = yyjson_read(success_result->output_json.c_str(), success_result->output_json.length(), 0);
-            if (!doc) {
+            if (!doc)
+            {
                 throw std::runtime_error("Failed to parse output JSON for command ID " + std::to_string(cmd_id));
             }
+            spdlog::debug("Successfully parsed referenced JSON document.");
 
             yyjson_val *root = yyjson_doc_get_root(doc);
-            if (!yyjson_is_obj(root)) {
+            if (!yyjson_is_obj(root))
+            {
                 yyjson_doc_free(doc);
                 throw std::runtime_error("Output of command ID " + std::to_string(cmd_id) + " is not a JSON object.");
             }
 
             yyjson_val *member_val = yyjson_obj_get(root, member_name.c_str());
-            if (!member_val) {
+            if (!member_val)
+            {
                 yyjson_doc_free(doc);
                 throw std::runtime_error("Member '" + member_name + "' not found in output of command ID " + std::to_string(cmd_id));
             }
+            spdlog::debug("Successfully found member '{}' in JSON.", member_name);
 
             const char *member_json_c_str = yyjson_val_write(member_val, 0, NULL);
+            if (!member_json_c_str)
+            {
+                yyjson_doc_free(doc);
+                throw std::runtime_error("Failed to write member '" + member_name + "' to string (yyjson_val_write returned null).");
+            }
+            spdlog::debug("Successfully created member JSON string.");
             std::string member_json(member_json_c_str);
-            free((void*)member_json_c_str);
+            free((void *)member_json_c_str);
             yyjson_doc_free(doc);
 
-            std::string quoted_ref = "\"" + full_match_str + "\"";
-            size_t pos = resolved_json.find(quoted_ref);
+            // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+            // ▼▼▼ ここからが修正箇所 ▼▼▼
+            // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+
+            // 最初にダブルクオーテーション付きの参照文字列を検索
+            std::string target_to_replace = "\"" + full_match_str + "\"";
+            size_t pos = resolved_json.find(target_to_replace);
+
+            // 見つからなかった場合、ダブルクオーテーションなしの参照文字列を検索
+            if (pos == std::string::npos) {
+                target_to_replace = full_match_str; // 検索対象をクオートなしに変更
+                pos = resolved_json.find(target_to_replace);
+                if (pos != std::string::npos) {
+                    spdlog::debug("Found unquoted reference, will replace it.");
+                }
+            } else {
+                spdlog::debug("Found quoted reference, will replace it.");
+            }
+
             if (pos != std::string::npos)
             {
-                resolved_json.replace(pos, quoted_ref.length(), member_json);
+                resolved_json.replace(pos, target_to_replace.length(), member_json);
+                spdlog::debug("Replacement complete.");
             }
+            else
+            {
+                spdlog::warn("Could not find the reference string '{}' (with or without quotes) for replacement.", full_match_str);
+            }
+
+            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+            // ▲▲▲ ここまでが修正箇所 ▲▲▲
+            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         }
+
+        spdlog::debug("Reference resolution finished. Final JSON: {}", resolved_json);
         return resolved_json;
     }
-
+    
     uint64_t CommandProcessor::add_to_queue(const std::string &command_name, const std::string &input_json)
     {
         const uint64_t id = next_command_id_++;
@@ -147,10 +199,13 @@ namespace MITSU_Domoe
         {
             task_logic = [this, handler = it->second.handler, input_json, command_name]
             {
-                try {
+                try
+                {
                     const std::string resolved_input_json = this->resolve_refs(input_json, command_name);
                     return handler(resolved_input_json);
-                } catch (const std::exception& e) {
+                }
+                catch (const std::exception &e)
+                {
                     return CommandResult(ErrorResult{"Error during reference resolution: " + std::string(e.what())});
                 }
             };
@@ -185,7 +240,7 @@ namespace MITSU_Domoe
         return names;
     }
 
-    std::map<std::string, std::string> CommandProcessor::get_input_schema(const std::string& command_name) const
+    std::map<std::string, std::string> CommandProcessor::get_input_schema(const std::string &command_name) const
     {
         auto it = cartridge_manager.find(command_name);
         if (it != cartridge_manager.end())

@@ -229,12 +229,13 @@ namespace MITSU_Domoe
 
                         if (root)
                         {
-                            // 2列のテーブルを開始
-                            if (ImGui::BeginTable("result_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+                            // 3列のテーブルを開始 // MODIFIED: 2 -> 3
+                            if (ImGui::BeginTable("result_table", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
                             {
-                                // (任意) テーブルのヘッダー
+                                // テーブルのヘッダー
                                 ImGui::TableSetupColumn("Field");
                                 ImGui::TableSetupColumn("Value");
+                                ImGui::TableSetupColumn("Reference", ImGuiTableColumnFlags_WidthFixed); // ADDED: 3列目のヘッダー
                                 ImGui::TableHeadersRow();
 
                                 // result_schemaをループして各行を生成
@@ -256,20 +257,29 @@ namespace MITSU_Domoe
                                             ImGui::TableSetColumnIndex(0);
                                             ImGui::TextUnformatted((name + "\n [" + type + "]").c_str());
 
-                                            // 2列目: 値 (折り返しあり)
+                                            // 2列目: 値 (折り返しあり、クリックで値自体をコピー)
                                             ImGui::TableSetColumnIndex(1);
-                                            ImGui::PushID(name.c_str()); // 同じ値が複数ある場合のためにIDをプッシュ
+                                            ImGui::PushID(name.c_str());
                                             ImGui::TextWrapped("%s", value_str);
-
-                                            // 直前のウィジェット(TextWrapped)がクリックされたかチェック
                                             if (ImGui::IsItemClicked())
                                             {
-                                                printf("Item copied to clip board! Value: %s\n", value_str);
-                                                // クリックされたら、そのテキストをクリップボードにコピー
                                                 ImGui::SetClipboardText(value_str);
                                                 ImGui::OpenPopup("CopiedPopup");
                                             }
                                             ImGui::PopID();
+
+                                            // ADDED: 3列目: 参照構文を生成するボタン
+                                            ImGui::TableSetColumnIndex(2);
+                                            std::string button_label = "Ref##" + name; // ボタンのIDをユニークにする
+                                            if (ImGui::Button(button_label.c_str()))
+                                            {
+                                                // $ref:cmd[id].member の形式で文字列を生成
+                                                std::string ref_syntax = "$ref:cmd[" + std::to_string(selected_result_id) + "]." + name;
+                                                // クリップボードにコピー
+                                                ImGui::SetClipboardText(ref_syntax.c_str());
+                                                ImGui::OpenPopup("CopiedPopup");
+                                            }
+                                            // END ADDED
 
                                             free((void *)value_str);
                                         }
@@ -278,7 +288,6 @@ namespace MITSU_Domoe
                                 ImGui::EndTable(); // テーブルを終了
                             }
                         }
-
                         yyjson_doc_free(doc);
                     }
                 }
@@ -309,3 +318,4 @@ namespace MITSU_Domoe
     }
 
 }
+

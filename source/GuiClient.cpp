@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <sstream>
 #include <cstring>
+#include <numbers>
 #include "yyjson.h"
 
 #include <glad/glad.h>
@@ -62,7 +63,7 @@ namespace MITSU_Domoe
                     auto output = rfl::json::read<ReadStlCartridge::Output>(success->output_json);
                     if (output)
                     {
-                        const auto& mesh = output->polygon_mesh;
+                        const auto &mesh = output->polygon_mesh;
                         Eigen::Vector3d min_bound = mesh.V.colwise().minCoeff();
                         Eigen::Vector3d max_bound = mesh.V.colwise().maxCoeff();
                         Eigen::Vector3d center = (min_bound + max_bound) / 2.0;
@@ -73,7 +74,7 @@ namespace MITSU_Domoe
                         state.camera_target = center.cast<float>();
                         state.distance = radius * 2.5f;
                         state.near_clip = 0.01f * radius;
-                        state.far_clip = 10.0f * radius;
+                        state.far_clip = 1000.0f * radius;
 
                         mesh_render_states[id] = std::move(state);
                     }
@@ -157,7 +158,7 @@ namespace MITSU_Domoe
         bool firstMouse = true;
         Eigen::Vector3f cameraPos = Eigen::Vector3f(0.0f, 0.0f, 3.0f);
         Eigen::Vector3f cameraFront = Eigen::Vector3f(0.0f, 0.0f, -1.0f);
-        Eigen::Vector3f cameraUp = Eigen::Vector3f(0.0f, 1.0f, 0.0f);
+        Eigen::Vector3f cameraUp = Eigen::Vector3f(0.0f, 0.0f, 1.0f);
 
         while (!glfwWindowShouldClose(window))
         {
@@ -393,13 +394,14 @@ namespace MITSU_Domoe
 
             if (mesh_render_states.count(selected_result_id))
             {
-                auto& state = mesh_render_states.at(selected_result_id);
+                auto &state = mesh_render_states.at(selected_result_id);
                 if (!io.WantCaptureMouse)
                 {
                     if (io.MouseWheel != 0.0f)
                     {
                         state.distance -= io.MouseWheel * 0.1f * state.distance;
-                        if (state.distance < 0.1f) state.distance = 0.1f;
+                        if (state.distance < 0.1f)
+                            state.distance = 0.1f;
                     }
 
                     if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
@@ -408,8 +410,10 @@ namespace MITSU_Domoe
                         ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
                         state.yaw -= delta.x * 0.25f;
                         state.pitch -= delta.y * 0.25f;
-                        if (state.pitch > 89.0f) state.pitch = 89.0f;
-                        if (state.pitch < -89.0f) state.pitch = -89.0f;
+                        if (state.pitch > 89.0f)
+                            state.pitch = 89.0f;
+                        if (state.pitch < -89.0f)
+                            state.pitch = -89.0f;
                     }
                 }
 
@@ -418,22 +422,34 @@ namespace MITSU_Domoe
                 far = state.far_clip;
 
                 Eigen::Vector3f dir;
-                dir.x() = cos(state.yaw * M_PI / 180.0f) * cos(state.pitch * M_PI / 180.0f);
-                dir.y() = sin(state.pitch * M_PI / 180.0f);
-                dir.z() = sin(state.yaw * M_PI / 180.0f) * cos(state.pitch * M_PI / 180.0f);
+                dir.x() = cos(state.yaw * std::numbers::pi / 180.0f) * cos(state.pitch * std::numbers::pi / 180.0f);
+                dir.y() = sin(state.yaw * std::numbers::pi / 180.0f) * cos(state.pitch * std::numbers::pi / 180.0f);
+                dir.z() = sin(state.pitch * std::numbers::pi / 180.0f);
                 current_camera_pos = state.camera_target - dir.normalized() * state.distance;
 
                 Eigen::Vector3f z_axis = (current_camera_pos - current_camera_target).normalized();
                 Eigen::Vector3f x_axis = cameraUp.cross(z_axis).normalized();
                 Eigen::Vector3f y_axis = z_axis.cross(x_axis);
-                view(0,0) = x_axis.x(); view(0,1) = x_axis.y(); view(0,2) = x_axis.z(); view(0,3) = -x_axis.dot(current_camera_pos);
-                view(1,0) = y_axis.x(); view(1,1) = y_axis.y(); view(1,2) = y_axis.z(); view(1,3) = -y_axis.dot(current_camera_pos);
-                view(2,0) = z_axis.x(); view(2,1) = z_axis.y(); view(2,2) = z_axis.z(); view(2,3) = -z_axis.dot(current_camera_pos);
-                view(3,0) = 0; view(3,1) = 0; view(3,2) = 0; view(3,3) = 1.0f;
+                view(0, 0) = x_axis.x();
+                view(0, 1) = x_axis.y();
+                view(0, 2) = x_axis.z();
+                view(0, 3) = -x_axis.dot(current_camera_pos);
+                view(1, 0) = y_axis.x();
+                view(1, 1) = y_axis.y();
+                view(1, 2) = y_axis.z();
+                view(1, 3) = -y_axis.dot(current_camera_pos);
+                view(2, 0) = z_axis.x();
+                view(2, 1) = z_axis.y();
+                view(2, 2) = z_axis.z();
+                view(2, 3) = -z_axis.dot(current_camera_pos);
+                view(3, 0) = 0;
+                view(3, 1) = 0;
+                view(3, 2) = 0;
+                view(3, 3) = 1.0f;
             }
 
             float aspect = (float)display_w / (float)display_h;
-            float top = near * tan(fov * 0.5f * M_PI / 180.0f);
+            float top = near * tan(fov * 0.5f * std::numbers::pi / 180.0f);
             float bottom = -top;
             float right = top * aspect;
             float left = -right;

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 project(rfl_test C CXX)
 
+file(COPY shader DESTINATION ${CMAKE_BINARY_DIR})
+
 message(${CMAKE_SOURCE_DIR})
 enable_testing()
 #set(CMAKE_CXX_FLAGS "/std:c++20")

@@ -11,12 +11,17 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <Eigen/Geometry>
+
 // All cartridges used in the app
 #include "ReadStlCartridge.hpp"
 #include "GenerateCentroidsCartridge_mock.hpp"
 #include "GenerateCentroidsCartridge.hpp"
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
+
+#include <rfl.hpp>
+#include <rfl_eigen_serdes.hpp>
 
 namespace
 {
@@ -38,15 +43,43 @@ namespace MITSU_Domoe
         processor->register_cartridge(Need_many_arg_mock_cartridge{});
     }
 
+    void GuiClient::process_stl_results()
+    {
+        auto results = get_all_results();
+        for (const auto &pair : results)
+        {
+            uint64_t id = pair.first;
+            if (mesh_render_states.count(id))
+            {
+                continue; // already processed
+            }
+
+            const auto &result = pair.second;
+            if (const auto *success = std::get_if<MITSU_Domoe::SuccessResult>(&result))
+            {
+                if (success->command_name == "readStl")
+                {
+                    auto output = rfl::json::read<ReadStlCartridge::Output>(success->output_json);
+                    if (output)
+                    {
+                        mesh_render_states[id] = MeshRenderState{
+                            .renderer = std::make_unique<Renderer>(output->polygon_mesh)};
+                    }
+                }
+            }
+        }
+    }
+
     void GuiClient::run()
     {
         glfwSetErrorCallback(glfw_error_callback);
         if (!glfwInit())
             return;
 
-        const char *glsl_version = "#version 130";
+        const char *glsl_version = "#version 330";
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
         GLFWwindow *window = glfwCreateWindow(1280, 720, "MITSUDomoe Client", nullptr, nullptr);
         if (window == nullptr)
@@ -55,6 +88,10 @@ namespace MITSU_Domoe
         if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
             return;
         glfwSwapInterval(1);
+
+        shader_manager.loadAllShaders("shader");
+
+        glEnable(GL_DEPTH_TEST);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -100,9 +137,22 @@ namespace MITSU_Domoe
             update_form_state(command_names_vec[0]);
         }
 
+        float yaw = -90.0f;
+        float pitch = 0.0f;
+        float lastX = 1280 / 2.0f;
+        float lastY = 720 / 2.0f;
+        float fov = 45.0f;
+        bool firstMouse = true;
+        Eigen::Vector3f cameraPos = Eigen::Vector3f(0.0f, 0.0f, 3.0f);
+        Eigen::Vector3f cameraFront = Eigen::Vector3f(0.0f, 0.0f, -1.0f);
+        Eigen::Vector3f cameraUp = Eigen::Vector3f(0.0f, 1.0f, 0.0f);
+
         while (!glfwWindowShouldClose(window))
         {
             glfwPollEvents();
+
+            process_stl_results();
+
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
@@ -285,6 +335,39 @@ namespace MITSU_Domoe
                                         }
                                     }
                                 }
+                                if (mesh_render_states.count(selected_result_id))
+                                {
+                                    ImGui::TableNextRow();
+                                    ImGui::TableSetColumnIndex(0);
+                                    ImGui::Text("Render");
+                                    ImGui::TableSetColumnIndex(1);
+
+                                    auto &state = mesh_render_states.at(selected_result_id);
+                                    ImGui::Checkbox("Visible", &state.is_visible);
+
+                                    std::string shader_names_str;
+                                    std::vector<std::string> shader_names_vec;
+                                    for (const auto &pair : shader_manager.Shaders)
+                                    {
+                                        shader_names_str += pair.first + '\0';
+                                        shader_names_vec.push_back(pair.first);
+                                    }
+
+                                    int current_shader_idx = -1;
+                                    for (int i = 0; i < shader_names_vec.size(); ++i)
+                                    {
+                                        if (shader_names_vec[i] == state.selected_shader_name)
+                                        {
+                                            current_shader_idx = i;
+                                            break;
+                                        }
+                                    }
+
+                                    if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str()))
+                                    {
+                                        state.selected_shader_name = shader_names_vec[current_shader_idx];
+                                    }
+                                }
                                 ImGui::EndTable(); // テーブルを終了
                             }
                         }
@@ -300,12 +383,53 @@ namespace MITSU_Domoe
                 ImGui::End();
             }
 
-            ImGui::Render();
+            // Rendering
             int display_w, display_h;
             glfwGetFramebufferSize(window, &display_w, &display_h);
             glViewport(0, 0, display_w, display_h);
             glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // Camera/View transformation
+            Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
+            Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
+
+            // lookAt
+            view.block<3, 3>(0, 0) = (Eigen::AngleAxisf(yaw, Eigen::Vector3f::UnitY()) * Eigen::AngleAxisf(pitch, Eigen::Vector3f::UnitX())).toRotationMatrix();
+            view.block<3, 1>(0, 3) = -view.block<3, 3>(0, 0) * cameraPos;
+
+            // perspective
+            float aspect = (float)display_w / (float)display_h;
+            float near = 0.1f;
+            float far = 100.0f;
+            float top = near * tan(fov * 0.5f * M_PI / 180.0f);
+            float bottom = -top;
+            float right = top * aspect;
+            float left = -right;
+            projection(0, 0) = (2.0f * near) / (right - left);
+            projection(1, 1) = (2.0f * near) / (top - bottom);
+            projection(0, 2) = (right + left) / (right - left);
+            projection(1, 2) = (top + bottom) / (top - bottom);
+            projection(2, 2) = -(far + near) / (far - near);
+            projection(3, 2) = -1.0f;
+            projection(2, 3) = -(2.0f * far * near) / (far - near);
+            projection(3, 3) = 0.0f;
+
+            for (auto const &[id, state] : mesh_render_states)
+            {
+                if (state.is_visible)
+                {
+                    Shader shader = shader_manager.getShader(state.selected_shader_name);
+                    shader.use();
+                    shader.setMatrix4fv("projection", projection);
+                    shader.setMatrix4fv("view", view);
+                    Eigen::Matrix4f model = Eigen::Matrix4f::Identity();
+                    shader.setMatrix4fv("model", model);
+                    state.renderer->draw(shader);
+                }
+            }
+
+            ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
             glfwSwapBuffers(window);
         }
@@ -318,4 +442,3 @@ namespace MITSU_Domoe
     }
 
 }
-

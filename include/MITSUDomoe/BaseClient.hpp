@@ -4,6 +4,7 @@
 #include "CommandProcessor.hpp"
 #include "ResultRepository.hpp"
 #include <memory>
+#include <filesystem>
 
 namespace MITSU_Domoe
 {
@@ -11,7 +12,7 @@ namespace MITSU_Domoe
 class BaseClient : public IClient
 {
 public:
-    BaseClient();
+    BaseClient(const std::filesystem::path& log_path);
     virtual ~BaseClient();
 
     void run() override = 0;

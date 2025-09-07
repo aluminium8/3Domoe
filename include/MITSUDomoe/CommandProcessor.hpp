@@ -4,6 +4,7 @@
 #include "ResultRepository.hpp"
 
 #include <rfl/json.hpp>
+#include <spdlog/spdlog.h>
 #include <atomic>
 #include <functional>
 #include <type_traits>
@@ -18,6 +19,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <filesystem>
 
 #if __has_include(<yyjson.h>)
 #include <yyjson.h>
@@ -32,7 +34,7 @@ namespace MITSU_Domoe
     class CommandProcessor
     {
     public:
-        CommandProcessor(std::shared_ptr<ResultRepository> repo);
+        CommandProcessor(std::shared_ptr<ResultRepository> repo, const std::filesystem::path& log_path);
         ~CommandProcessor();
 
         template <Cartridge C>
@@ -40,9 +42,9 @@ namespace MITSU_Domoe
         {
 
             std::string command_name=cartridge.command_name;
-            std::cout<<"command_name:"<< command_name<<std::endl;
+            spdlog::debug("Registering command: {}", command_name);
             if(cartridge_manager.count(command_name)){
-                std::cout<<"WARN: cartridge will be overwritten"<<std::endl;
+                spdlog::warn("Cartridge '{}' is being overwritten.", command_name);
             }
 
 
@@ -91,7 +93,7 @@ namespace MITSU_Domoe
 
 
 
-            std::cout << "Cartridge registered: " << command_name << std::endl;
+            spdlog::info("Cartridge registered: {}", command_name);
         }
 
         uint64_t add_to_queue(const std::string &command_name, const std::string &input_json);
@@ -122,10 +124,18 @@ namespace MITSU_Domoe
 
 
         std::map<std::string, Cartridge_info> cartridge_manager;
-        // std::map<std::string, std::function<CommandResult(const std::string&)>> handlers_;
-        std::queue<std::pair<uint64_t, std::function<CommandResult()>>> command_queue_;
+
+        struct CommandTask {
+            uint64_t id;
+            std::string command_name;
+            std::string input_json;
+            std::function<CommandResult()> task;
+        };
+        std::queue<CommandTask> command_queue_;
+
         std::atomic<uint64_t> next_command_id_{1};
         std::shared_ptr<ResultRepository> result_repo_;
+        std::filesystem::path log_path_;
 
         std::thread worker_thread_;
         std::mutex queue_mutex_;

@@ -3,10 +3,10 @@
 namespace MITSU_Domoe
 {
 
-BaseClient::BaseClient()
+BaseClient::BaseClient(const std::filesystem::path& log_path)
 {
     result_repo = std::make_shared<ResultRepository>();
-    processor = std::make_unique<CommandProcessor>(result_repo);
+    processor = std::make_unique<CommandProcessor>(result_repo, log_path);
 }
 
 BaseClient::~BaseClient()

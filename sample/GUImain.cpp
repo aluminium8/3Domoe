@@ -1,10 +1,11 @@
 #include <MITSUDomoe/GuiClient.hpp>
+#include <MITSUDomoe/Logger.hpp>
 #include <memory>
-#include <spdlog/spdlog.h>
+
 int main(int, char **)
 {
-    spdlog::set_level(spdlog::level::debug); // ★この行を追加
-    auto client = std::make_unique<MITSU_Domoe::GuiClient>();
+    auto log_path = MITSU_Domoe::initialize_logger();
+    auto client = std::make_unique<MITSU_Domoe::GuiClient>(log_path);
     client->run();
     return 0;
 }

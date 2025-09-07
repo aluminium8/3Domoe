@@ -1,12 +1,17 @@
 #include <MITSUDomoe/CommandProcessor.hpp>
+#include <MITSUDomoe/Logger.hpp>
 #include <iostream>
 #include <regex>
 #include <spdlog/spdlog.h>
+#include <fstream>
+#include <rfl/json.hpp>
+#include <iomanip>
+
 namespace MITSU_Domoe
 {
 
-    CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo)
-        : result_repo_(std::move(repo)) {}
+    CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo, const std::filesystem::path& log_path)
+        : result_repo_(std::move(repo)), log_path_(log_path) {}
 
     CommandProcessor::~CommandProcessor()
     {
@@ -35,7 +40,7 @@ namespace MITSU_Domoe
     {
         while (true)
         {
-            std::pair<uint64_t, std::function<CommandResult()>> task_pair;
+            CommandTask current_task;
             {
                 std::unique_lock<std::mutex> lock(queue_mutex_);
                 condition_.wait(lock, [this]
@@ -46,16 +51,46 @@ namespace MITSU_Domoe
                     return;
                 }
 
-                task_pair = std::move(command_queue_.front());
+                current_task = std::move(command_queue_.front());
                 command_queue_.pop();
             }
 
-            auto &[id, task] = task_pair;
-            std::cout << "Executing command with ID " << id << "..." << std::endl;
-            CommandResult result = task();
-            result_repo_->store_result(id, std::move(result));
-            std::cout << "Result for command ID " << id << " stored." << std::endl
-                      << std::endl;
+            spdlog::info("Executing command '{}' with ID {}...", current_task.command_name, current_task.id);
+            CommandResult result = current_task.task();
+
+            std::stringstream ss;
+            ss << "{";
+            ss << "\"id\":" << current_task.id << ",";
+            ss << "\"command\":\"" << current_task.command_name << "\",";
+            ss << "\"request\":" << current_task.input_json << ",";
+
+            if (const auto* success = std::get_if<SuccessResult>(&result)) {
+                ss << "\"status\":\"success\",";
+                ss << "\"response\":" << success->output_json;
+            } else if (const auto* error = std::get_if<ErrorResult>(&result)) {
+                // A quick and dirty way to escape quotes in the error message
+                std::string error_msg = error->error_message;
+                std::string escaped_error_msg;
+                for (char c : error_msg) {
+                    if (c == '\"') {
+                        escaped_error_msg += "\\\"";
+                    } else {
+                        escaped_error_msg += c;
+                    }
+                }
+                ss << "\"status\":\"error\",";
+                ss << "\"response\":\"" << escaped_error_msg << "\"";
+            }
+            ss << "}";
+
+            std::stringstream filename_ss;
+            filename_ss << std::setw(LOG_ID_PADDING) << std::setfill('0') << current_task.id
+                        << "_" << current_task.command_name << ".json";
+            std::ofstream log_file(log_path_ / filename_ss.str());
+            log_file << ss.str();
+
+            result_repo_->store_result(current_task.id, std::move(result));
+            spdlog::info("Result for command ID {} stored.", current_task.id);
         }
     }
 
@@ -220,12 +255,11 @@ namespace MITSU_Domoe
 
         {
             std::lock_guard<std::mutex> lock(queue_mutex_);
-            command_queue_.emplace(id, std::move(task_logic));
+            command_queue_.emplace(CommandTask{id, command_name, input_json, std::move(task_logic)});
         }
         condition_.notify_one();
 
-        std::cout << "Command '" << command_name << "' with ID " << id
-                  << " added to the queue." << std::endl;
+        spdlog::info("Command '{}' with ID {} added to the queue. Input: {}", command_name, id, input_json);
         return id;
     }
 

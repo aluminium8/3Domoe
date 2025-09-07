@@ -35,7 +35,7 @@ namespace
 namespace MITSU_Domoe
 {
 
-    GuiClient::GuiClient()
+    GuiClient::GuiClient(const std::filesystem::path& log_path) : BaseClient(log_path)
     {
         processor->register_cartridge(ReadStlCartridge{});
         processor->register_cartridge(GenerateCentroidsCartridge_mock{});

@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <filesystem>
 
 
 namespace MITSU_Domoe {
@@ -30,7 +31,7 @@ struct MeshRenderState
 class GuiClient : public BaseClient
 {
 public:
-    GuiClient();
+    GuiClient(const std::filesystem::path& log_path);
     ~GuiClient() = default;
 
     void run() override;

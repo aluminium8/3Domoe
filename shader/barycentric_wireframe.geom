@@ -3,17 +3,13 @@
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 3) out;
 
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+uniform mat4 MVP;
 
 // フラグメントシェーダに渡す重心
 out vec3 fragBarycenter;
 out vec3 fragBaryCooPoint;
 
 void main(void) {
-
-    mat4 mvp2 = projection * view * model;
 
     vec3 barycentricCoords[3] = vec3[3](
         vec3(1.0, 0.0, 0.0), // 頂点0
@@ -38,7 +34,7 @@ void main(void) {
 
     for (int i = 0; i < 3; i++) {
 
-        gl_Position = mvp2*gl_in[i].gl_Position;
+        gl_Position = MVP * gl_in[i].gl_Position;
         //gl_Position = gl_in[i].gl_Position;
         fragBarycenter = barycenter;
         barycentricCoords[i]*= doubled_area/length(hen[i]);

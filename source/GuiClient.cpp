@@ -481,10 +481,9 @@ namespace MITSU_Domoe
                 {
                     Shader shader = shader_manager.getShader(state.selected_shader_name);
                     shader.use();
-                    shader.setMatrix4fv("projection", projection);
-                    shader.setMatrix4fv("view", view);
                     Eigen::Matrix4f model = Eigen::Matrix4f::Identity();
-                    shader.setMatrix4fv("model", model);
+                    Eigen::Matrix4f mvp = projection * view * model;
+                    shader.setMatrix4fv("MVP", mvp);
                     state.renderer->draw(shader);
                 }
             }

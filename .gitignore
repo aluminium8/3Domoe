@@ -48,3 +48,6 @@
 
 # vscode configu
 /.vscode/
+
+guimain.log
+imgui.ini

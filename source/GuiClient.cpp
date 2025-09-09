@@ -20,6 +20,7 @@
 #include "GenerateCentroidsCartridge.hpp"
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
+#include "CutMeshCartridge.hpp"
 
 #include <rfl.hpp>
 #include <rfl_eigen_serdes.hpp>
@@ -42,28 +43,35 @@ namespace MITSU_Domoe
         processor->register_cartridge(GenerateCentroidsCartridge{});
         processor->register_cartridge(BIGprocess_mock_cartridge{});
         processor->register_cartridge(Need_many_arg_mock_cartridge{});
+        processor->register_cartridge(CutMeshCartridge{});
     }
 
 void GuiClient::process_mesh_results() {
   auto results = get_all_results();
   for (const auto &pair : results) {
     uint64_t id = pair.first;
-    if (mesh_render_states.count(id)) {
-      continue; // already processed
-    }
-
     const auto &result = pair.second;
+
     if (const auto *success =
             std::get_if<MITSU_Domoe::SuccessResult>(&result)) {
       for (const auto &output_pair : success->output_schema) {
         const std::string &output_name = output_pair.first;
         const std::string &output_type = output_pair.second;
 
+        auto mesh_key = std::make_pair(id, output_name);
+        if (mesh_render_states.count(mesh_key)) {
+            continue; // already processed
+        }
+
         if (output_type.find("Polygon_mesh") != std::string::npos) {
           yyjson_doc *doc = yyjson_read(success->output_json.c_str(),
                                         success->output_json.length(), 0);
           yyjson_val *root = yyjson_doc_get_root(doc);
           yyjson_val *mesh_val = yyjson_obj_get(root, output_name.c_str());
+          if (!mesh_val) {
+              yyjson_doc_free(doc);
+              continue;
+          }
           const char* mesh_json = yyjson_val_write(mesh_val, 0, NULL);
 
           auto mesh_obj =
@@ -86,17 +94,13 @@ void GuiClient::process_mesh_results() {
             state.near_clip = 0.01f * radius;
             state.far_clip = 1000.0f * radius;
 
-            mesh_render_states[id] = std::move(state);
-            // NOTE: 現状の実装では1つのコマンド結果に1つのメッシュしか対応できない
-            // 複数のメッシュを描画したい場合は、mesh_render_statesのキーを
-            // (result_id, output_name) のペアにするなどの変更が必要
-            break;
+            mesh_render_states[mesh_key] = std::move(state);
           }
-            }
-      }
         }
-  }
+      }
     }
+  }
+}
 
     void GuiClient::run()
     {
@@ -361,33 +365,42 @@ void GuiClient::process_mesh_results() {
                                         }
                                     }
                                 }
-                                if (mesh_render_states.count(selected_result_id))
-                                {
-                                    ImGui::TableNextRow();
-                                    ImGui::TableSetColumnIndex(0);
-                                    ImGui::Text("Render");
-                                    ImGui::TableSetColumnIndex(1);
-                                    auto &state = mesh_render_states.at(selected_result_id);
-                                    ImGui::Checkbox("Visible", &state.is_visible);
-                                    std::string shader_names_str;
-                                    std::vector<std::string> shader_names_vec;
-                                    for (const auto &pair : shader_manager.Shaders)
-                                    {
-                                        shader_names_str += pair.first + '\0';
-                                        shader_names_vec.push_back(pair.first);
-                                    }
-                                    int current_shader_idx = -1;
-                                    for (int i = 0; i < shader_names_vec.size(); ++i)
-                                    {
-                                        if (shader_names_vec[i] == state.selected_shader_name)
-                                        {
-                                            current_shader_idx = i;
-                                            break;
+                                // Render controls for each mesh
+                                for (const auto &schema_pair : result_schema) {
+                                    const std::string &output_name = schema_pair.first;
+                                    const std::string &output_type = schema_pair.second;
+
+                                    if (output_type.find("Polygon_mesh") != std::string::npos) {
+                                        auto mesh_key = std::make_pair(selected_result_id, output_name);
+                                        if (mesh_render_states.count(mesh_key)) {
+                                            ImGui::TableNextRow();
+                                            ImGui::TableSetColumnIndex(0);
+                                            ImGui::Text("Render: %s", output_name.c_str());
+                                            ImGui::TableSetColumnIndex(1);
+
+                                            auto &state = mesh_render_states.at(mesh_key);
+
+                                            ImGui::PushID(output_name.c_str());
+                                            ImGui::Checkbox("Visible", &state.is_visible);
+
+                                            std::string shader_names_str;
+                                            std::vector<std::string> shader_names_vec;
+                                            for (const auto &pair : shader_manager.Shaders) {
+                                                shader_names_str += pair.first + '\0';
+                                                shader_names_vec.push_back(pair.first);
+                                            }
+                                            int current_shader_idx = -1;
+                                            for (int i = 0; i < shader_names_vec.size(); ++i) {
+                                                if (shader_names_vec[i] == state.selected_shader_name) {
+                                                    current_shader_idx = i;
+                                                    break;
+                                                }
+                                            }
+                                            if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str())) {
+                                                state.selected_shader_name = shader_names_vec[current_shader_idx];
+                                            }
+                                            ImGui::PopID();
                                         }
-                                    }
-                                    if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str()))
-                                    {
-                                        state.selected_shader_name = shader_names_vec[current_shader_idx];
                                     }
                                 }
                                 ImGui::EndTable();
@@ -420,9 +433,18 @@ void GuiClient::process_mesh_results() {
             float near = 0.1f;
             float far = 100.0f;
 
-            if (mesh_render_states.count(selected_result_id))
+            // Find the first mesh associated with the selected result to control the camera
+            MITSU_Domoe::MeshRenderState* camera_target_state = nullptr;
+            for(auto& [key, state] : mesh_render_states) {
+                if (key.first == selected_result_id) {
+                    camera_target_state = &state;
+                    break;
+                }
+            }
+
+            if (camera_target_state)
             {
-                auto &state = mesh_render_states.at(selected_result_id);
+                auto &state = *camera_target_state;
                 if (!io.WantCaptureMouse)
                 {
                     if (io.MouseWheel != 0.0f)
@@ -490,7 +512,7 @@ void GuiClient::process_mesh_results() {
             projection(2, 3) = -(2.0f * far * near) / (far - near);
             projection(3, 3) = 0.0f;
 
-            for (auto const &[id, state] : mesh_render_states)
+            for (auto const &[mesh_key, state] : mesh_render_states)
             {
                 if (state.is_visible)
                 {

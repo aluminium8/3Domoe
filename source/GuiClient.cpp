@@ -44,43 +44,58 @@ namespace MITSU_Domoe
         processor->register_cartridge(Need_many_arg_mock_cartridge{});
     }
 
-    void GuiClient::process_stl_results()
-    {
-        auto results = get_all_results();
-        for (const auto &pair : results)
-        {
-            uint64_t id = pair.first;
-            if (mesh_render_states.count(id))
-            {
-                continue; // already processed
+void GuiClient::process_mesh_results() {
+  auto results = get_all_results();
+  for (const auto &pair : results) {
+    uint64_t id = pair.first;
+    if (mesh_render_states.count(id)) {
+      continue; // already processed
+    }
+
+    const auto &result = pair.second;
+    if (const auto *success =
+            std::get_if<MITSU_Domoe::SuccessResult>(&result)) {
+      for (const auto &output_pair : success->output_schema) {
+        const std::string &output_name = output_pair.first;
+        const std::string &output_type = output_pair.second;
+
+        if (output_type == "Polygon_mesh") {
+          yyjson_doc *doc = yyjson_read(success->output_json.c_str(),
+                                        success->output_json.length(), 0);
+          yyjson_val *root = yyjson_doc_get_root(doc);
+          yyjson_val *mesh_val = yyjson_obj_get(root, output_name.c_str());
+          const char* mesh_json = yyjson_val_write(mesh_val, 0, NULL);
+
+          auto mesh_obj =
+              rfl::json::read<MITSU_Domoe::Polygon_mesh>(mesh_json);
+
+          free((void*)mesh_json);
+          yyjson_doc_free(doc);
+
+          if (mesh_obj) {
+            const auto &mesh = *mesh_obj;
+            Eigen::Vector3d min_bound = mesh.V.colwise().minCoeff();
+            Eigen::Vector3d max_bound = mesh.V.colwise().maxCoeff();
+            Eigen::Vector3d center = (min_bound + max_bound) / 2.0;
+            double radius = (max_bound - min_bound).norm() / 2.0;
+
+            MeshRenderState state;
+            state.renderer = std::make_unique<Renderer>(mesh);
+            state.camera_target = center.cast<float>();
+            state.distance = radius * 2.5f;
+            state.near_clip = 0.01f * radius;
+            state.far_clip = 1000.0f * radius;
+
+            mesh_render_states[id] = std::move(state);
+            // NOTE: 現状の実装では1つのコマンド結果に1つのメッシュしか対応できない
+            // 複数のメッシュを描画したい場合は、mesh_render_statesのキーを
+            // (result_id, output_name) のペアにするなどの変更が必要
+            break;
+          }
             }
-
-            const auto &result = pair.second;
-            if (const auto *success = std::get_if<MITSU_Domoe::SuccessResult>(&result))
-            {
-                if (success->command_name == "readStl")
-                {
-                    auto output = rfl::json::read<ReadStlCartridge::Output>(success->output_json);
-                    if (output)
-                    {
-                        const auto &mesh = output->polygon_mesh;
-                        Eigen::Vector3d min_bound = mesh.V.colwise().minCoeff();
-                        Eigen::Vector3d max_bound = mesh.V.colwise().maxCoeff();
-                        Eigen::Vector3d center = (min_bound + max_bound) / 2.0;
-                        double radius = (max_bound - min_bound).norm() / 2.0;
-
-                        MeshRenderState state;
-                        state.renderer = std::make_unique<Renderer>(mesh);
-                        state.camera_target = center.cast<float>();
-                        state.distance = radius * 2.5f;
-                        state.near_clip = 0.01f * radius;
-                        state.far_clip = 1000.0f * radius;
-
-                        mesh_render_states[id] = std::move(state);
-                    }
-                }
-            }
+      }
         }
+  }
     }
 
     void GuiClient::run()
@@ -164,7 +179,7 @@ namespace MITSU_Domoe
         {
             glfwPollEvents();
 
-            process_stl_results();
+            process_mesh_results();
 
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();

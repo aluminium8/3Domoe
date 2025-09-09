@@ -66,7 +66,8 @@ namespace MITSU_Domoe
 
             if (const auto* success = std::get_if<SuccessResult>(&result)) {
                 ss << "\"status\":\"success\",";
-                ss << "\"response\":" << success->output_json;
+                ss << "\"response\":" << success->output_json << ",";
+                ss << "\"schema\":" << rfl::json::write(success->output_schema);
             } else if (const auto* error = std::get_if<ErrorResult>(&result)) {
                 // A quick and dirty way to escape quotes in the error message
                 std::string error_msg = error->error_message;

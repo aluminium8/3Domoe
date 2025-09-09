@@ -59,7 +59,7 @@ void GuiClient::process_mesh_results() {
         const std::string &output_name = output_pair.first;
         const std::string &output_type = output_pair.second;
 
-        if (output_type == "Polygon_mesh") {
+        if (output_type.find("Polygon_mesh") != std::string::npos) {
           yyjson_doc *doc = yyjson_read(success->output_json.c_str(),
                                         success->output_json.length(), 0);
           yyjson_val *root = yyjson_doc_get_root(doc);

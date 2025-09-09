@@ -17,14 +17,14 @@ class CutMeshCartridge
 public:
     struct Input
     {
-        rfl::Field<"input_mesh", MITSU_Domoe::Polygon_mesh> input_mesh;
+        MITSU_Domoe::Polygon_mesh input_mesh;
     };
 
     struct Output
     {
-        rfl::Field<"mesh_a", MITSU_Domoe::Polygon_mesh> mesh_a;
-        rfl::Field<"mesh_b", MITSU_Domoe::Polygon_mesh> mesh_b;
-        rfl::Field<"message", std::string> message;
+        MITSU_Domoe::Polygon_mesh mesh_a;
+        MITSU_Domoe::Polygon_mesh mesh_b;
+        std::string message;
     };
 
     static inline const std::string command_name = "cutMeshByArea";
@@ -32,8 +32,8 @@ public:
 
     Output execute(const Input &input) const
     {
-        const auto& V = input.input_mesh.value().V;
-        const auto& F = input.input_mesh.value().F;
+        const auto& V = input.input_mesh.V;
+        const auto& F = input.input_mesh.F;
 
         if (V.rows() == 0 || F.rows() == 0) {
             return Output{ .mesh_a = {}, .mesh_b = {}, .message = "Input mesh is empty." };

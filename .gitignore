@@ -51,3 +51,6 @@
 
 guimain.log
 imgui.ini
+
+# Log files
+/result/

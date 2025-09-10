@@ -57,6 +57,7 @@ namespace MITSU_Domoe
 
             for (const auto &f : rfl::fields<typename C::Output>())
             {
+                spdlog::debug("Registering output for command '{}': field_name='{}', field_type='{}'", command_name, f.name(), f.type());
                 cartridge_manager[command_name].output_schema[f.name()] = f.type();
             }
 

@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <filesystem>
+#include <utility>
 
 
 namespace MITSU_Domoe {
@@ -37,10 +38,10 @@ public:
     void run() override;
 
 private:
-    void process_stl_results();
+    void process_mesh_results();
 
     ShaderManager shader_manager;
-    std::map<uint64_t, MeshRenderState> mesh_render_states;
+    std::map<std::pair<uint64_t, std::string>, MeshRenderState> mesh_render_states;
 };
 
 }

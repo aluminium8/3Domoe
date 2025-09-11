@@ -138,6 +138,7 @@ namespace MITSU_Domoe
         std::atomic<uint64_t> next_command_id_{1};
         std::shared_ptr<ResultRepository> result_repo_;
         std::filesystem::path log_path_;
+        std::filesystem::path command_history_path_;
 
         std::thread worker_thread_;
         std::mutex queue_mutex_;

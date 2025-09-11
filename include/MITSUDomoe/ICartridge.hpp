@@ -34,6 +34,8 @@ struct SuccessResult {
     std::any input_raw;
     std::any output_raw;
     std::map<std::string, std::string> output_schema;
+    std::string unresolved_input_json;
+    std::string resolved_input_json;
 };
 struct ErrorResult {
     std::string error_message;

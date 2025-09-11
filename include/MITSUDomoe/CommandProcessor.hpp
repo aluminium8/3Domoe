@@ -122,7 +122,7 @@ namespace MITSU_Domoe
             std::string description;
         };
 
-        std::string resolve_refs(const std::string &input_json, const std::string& command_name_of_current_cmd);
+        std::string resolve_refs(const std::string &input_json, const std::string& command_name_of_current_cmd, uint64_t current_cmd_id);
 
 
         std::map<std::string, Cartridge_info> cartridge_manager;

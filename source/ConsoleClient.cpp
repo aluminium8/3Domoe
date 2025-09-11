@@ -154,7 +154,7 @@ void ConsoleClient::run_tests() {
 void ConsoleClient::handle_load(const std::string& path_str) {
     const std::filesystem::path path(path_str);
 
-    auto process_file = [](const std::filesystem::path& file_path) {
+    auto process_file = [this](const std::filesystem::path& file_path) {
         if (file_path.extension() != ".json") {
             return;
         }
@@ -165,6 +165,9 @@ void ConsoleClient::handle_load(const std::string& path_str) {
             return;
         }
         const std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+
+        // Store the result from the log in the repository
+        this->load_result(content);
 
         // Pretty-print the JSON
         try {

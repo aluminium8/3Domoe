@@ -285,4 +285,48 @@ namespace MITSU_Domoe
         return {};
     }
 
+    void CommandProcessor::load_result_from_log(const std::string& json_content) {
+        struct LogFileFormat {
+            rfl::Field<"id", uint64_t> id;
+            rfl::Field<"command", std::string> command;
+            rfl::Field<"status", std::string> status;
+            rfl::Field<"response", rfl::Generic> response;
+            rfl::Field<"schema", std::optional<std::map<std::string, std::string>>> schema;
+        };
+
+        auto parsed_log = rfl::json::read<LogFileFormat>(json_content);
+        if (!parsed_log) {
+            spdlog::error("Failed to parse log file for loading: {}", parsed_log.error().what());
+            return;
+        }
+
+        const auto& log = *parsed_log;
+
+        if (log.status() == "success" && log.schema()) {
+            SuccessResult success;
+            success.command_name = log.command();
+            success.output_json = rfl::json::write(log.response());
+            success.output_schema = *log.schema();
+            // input_raw and output_raw are left empty as they are not needed for tracing.
+
+            result_repo_->store_result(log.id(), std::move(success));
+            spdlog::info("Successfully loaded result for command ID {} from log.", log.id());
+
+        } else if (log.status() == "error") {
+            ErrorResult error;
+            // The response for an error is a simple string.
+            auto str_result = rfl::to_string(log.response());
+            if (str_result) {
+                error.error_message = *str_result;
+            } else {
+                error.error_message = "Could not parse error message from log.";
+            }
+            result_repo_->store_result(log.id(), std::move(error));
+            spdlog::info("Successfully loaded error result for command ID {} from log.", log.id());
+
+        } else {
+            spdlog::warn("Could not load result from log for command ID {}: Status was not 'success' with a schema, or 'error'.", log.id());
+        }
+    }
+
 } // namespace MITSU_Domoe

@@ -17,6 +17,9 @@ public:
 
     void run() override = 0;
 
+public:
+    void load_result(const std::string& json_content);
+
 protected:
     uint64_t post_command(const std::string& command_name, const std::string& json_input) override;
     std::optional<CommandResult> get_result(uint64_t command_id) override;

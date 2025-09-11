@@ -572,6 +572,9 @@ void GuiClient::process_mesh_results() {
             }
             const std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
+            // Store the result from the log in the repository
+            this->load_result(content);
+
             try {
                 auto parsed = rfl::json::read<rfl::Generic>(content);
                 if (!parsed) {

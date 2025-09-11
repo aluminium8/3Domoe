@@ -41,4 +41,8 @@ std::map<std::string, std::string> BaseClient::get_input_schema(const std::strin
     return processor->get_input_schema(command_name);
 }
 
+void BaseClient::load_result(const std::string& json_content) {
+    processor->load_result_from_log(json_content);
+}
+
 }

@@ -10,7 +10,7 @@
 namespace MITSU_Domoe
 {
 
-    CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo, const std::filesystem::path& log_path)
+    CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo, const std::filesystem::path &log_path)
         : result_repo_(std::move(repo)), log_path_(log_path) {}
 
     CommandProcessor::~CommandProcessor()
@@ -64,18 +64,25 @@ namespace MITSU_Domoe
             ss << "\"command\":\"" << current_task.command_name << "\",";
             ss << "\"request\":" << current_task.input_json << ",";
 
-            if (const auto* success = std::get_if<SuccessResult>(&result)) {
+            if (const auto *success = std::get_if<SuccessResult>(&result))
+            {
                 ss << "\"status\":\"success\",";
                 ss << "\"response\":" << success->output_json << ",";
                 ss << "\"schema\":" << rfl::json::write(success->output_schema);
-            } else if (const auto* error = std::get_if<ErrorResult>(&result)) {
+            }
+            else if (const auto *error = std::get_if<ErrorResult>(&result))
+            {
                 // A quick and dirty way to escape quotes in the error message
                 std::string error_msg = error->error_message;
                 std::string escaped_error_msg;
-                for (char c : error_msg) {
-                    if (c == '\"') {
+                for (char c : error_msg)
+                {
+                    if (c == '\"')
+                    {
                         escaped_error_msg += "\\\"";
-                    } else {
+                    }
+                    else
+                    {
                         escaped_error_msg += c;
                     }
                 }
@@ -197,13 +204,17 @@ namespace MITSU_Domoe
             size_t pos = resolved_json.find(target_to_replace);
 
             // 見つからなかった場合、ダブルクオーテーションなしの参照文字列を検索
-            if (pos == std::string::npos) {
+            if (pos == std::string::npos)
+            {
                 target_to_replace = full_match_str; // 検索対象をクオートなしに変更
                 pos = resolved_json.find(target_to_replace);
-                if (pos != std::string::npos) {
+                if (pos != std::string::npos)
+                {
                     spdlog::debug("Found unquoted reference, will replace it.");
                 }
-            } else {
+            }
+            else
+            {
                 spdlog::debug("Found quoted reference, will replace it.");
             }
 
@@ -225,7 +236,7 @@ namespace MITSU_Domoe
         spdlog::debug("Reference resolution finished. Final JSON: {}", resolved_json);
         return resolved_json;
     }
-    
+
     uint64_t CommandProcessor::add_to_queue(const std::string &command_name, const std::string &input_json)
     {
         const uint64_t id = next_command_id_++;
@@ -285,46 +296,62 @@ namespace MITSU_Domoe
         return {};
     }
 
-    void CommandProcessor::load_result_from_log(const std::string& json_content) {
-        struct LogFileFormat {
+    void CommandProcessor::load_result_from_log(const std::string &json_content)
+    {
+        struct LogFileFormat
+        {
             rfl::Field<"id", uint64_t> id;
             rfl::Field<"command", std::string> command;
             rfl::Field<"status", std::string> status;
+            rfl::Field<"request", rfl::Generic> request;
             rfl::Field<"response", rfl::Generic> response;
             rfl::Field<"schema", std::optional<std::map<std::string, std::string>>> schema;
         };
 
         auto parsed_log = rfl::json::read<LogFileFormat>(json_content);
-        if (!parsed_log) {
+        if (!parsed_log)
+        {
             spdlog::error("Failed to parse log file for loading: {}", parsed_log.error().what());
             return;
         }
 
-        const auto& log = *parsed_log;
+        parsed_log->command.value() = parsed_log->command.value() + "(Loaded)";
 
-        if (log.status() == "success" && log.schema()) {
+        const auto &log = *parsed_log;
+        spdlog::info("request: {}", rfl::json::write(log.request()));
+        
+        spdlog::info("response: {}", rfl::json::write(log.response()));
+
+        if (log.status() == "success" && log.schema())
+        {
             SuccessResult success;
             success.command_name = log.command();
             success.output_json = rfl::json::write(log.response());
             success.output_schema = *log.schema();
+            
             // input_raw and output_raw are left empty as they are not needed for tracing.
 
             result_repo_->store_result(log.id(), std::move(success));
             spdlog::info("Successfully loaded result for command ID {} from log.", log.id());
-
-        } else if (log.status() == "error") {
+        }
+        else if (log.status() == "error")
+        {
             ErrorResult error;
             // The response for an error is a simple string.
             auto str_result = rfl::to_string(log.response());
-            if (str_result) {
+            if (str_result)
+            {
                 error.error_message = *str_result;
-            } else {
+            }
+            else
+            {
                 error.error_message = "Could not parse error message from log.";
             }
             result_repo_->store_result(log.id(), std::move(error));
             spdlog::info("Successfully loaded error result for command ID {} from log.", log.id());
-
-        } else {
+        }
+        else
+        {
             spdlog::warn("Log for command ID {} could not be loaded. A 'success' status requires a 'schema' field, which was not found. This may be an old log file format.", log.id());
         }
     }

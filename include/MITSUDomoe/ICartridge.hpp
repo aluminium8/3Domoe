@@ -27,6 +27,9 @@ concept Cartridge = requires(T cartridge, const typename T::Input& input) {
 // 成功時はシリアライズされたOutput(JSON文字列)を、失敗時はエラー情報を保持
 struct SuccessResult {
     std::string command_name;
+    std::string input_json_ref_solved;
+    std::string input_json_original;
+    
     std::string output_json;
     std::any input_raw;
     std::any output_raw;

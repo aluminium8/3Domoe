@@ -154,6 +154,8 @@ void GuiClient::process_mesh_results() {
         static uint64_t selected_result_id = 0;
         static std::string result_json_output;
         static std::map<std::string, std::string> result_schema;
+        static std::string unresolved_input_for_display;
+        static std::string resolved_input_for_display;
 
         auto update_form_state = [&](const std::string &command_name)
         {
@@ -267,6 +269,10 @@ void GuiClient::process_mesh_results() {
                 if (ImGui::Button("Trace Log")) {
                     handle_trace(log_path_buffer);
                 }
+                ImGui::SameLine();
+                if (ImGui::Button("Trace Command History")) {
+                    handle_trace_history(log_path_buffer);
+                }
 
                 if (!loaded_log_content.empty()) {
                     ImGui::Separator();
@@ -303,11 +309,15 @@ void GuiClient::process_mesh_results() {
                         {
                             result_json_output = success->output_json;
                             result_schema = success->output_schema;
+                            unresolved_input_for_display = success->unresolved_input_json;
+                            resolved_input_for_display = success->resolved_input_json;
                         }
                         else if (const auto *error = std::get_if<MITSU_Domoe::ErrorResult>(&result))
                         {
                             result_json_output = "Error: " + error->error_message;
                             result_schema.clear();
+                            unresolved_input_for_display = "N/A";
+                            resolved_input_for_display = "N/A";
                         }
                     }
                 }
@@ -319,6 +329,12 @@ void GuiClient::process_mesh_results() {
                 ImGui::Text("Result:");
                 if (selected_result_id != 0)
                 {
+                    ImGui::Text("Unresolved Input:");
+                    ImGui::InputTextMultiline("##unresolved_input", &unresolved_input_for_display[0], unresolved_input_for_display.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_ReadOnly);
+                    ImGui::Text("Resolved Input:");
+                    ImGui::InputTextMultiline("##resolved_input", &resolved_input_for_display[0], resolved_input_for_display.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_ReadOnly);
+                    ImGui::Separator();
+
                     if (result_schema.empty())
                     {
                         ImGui::TextWrapped("%s", result_json_output.c_str());
@@ -654,6 +670,59 @@ void GuiClient::process_mesh_results() {
             process_file(path);
         } else {
             spdlog::error("Path is not a valid file or directory: {}", path_str);
+        }
+    }
+
+    void GuiClient::handle_trace_history(const std::string& path_str) {
+        const std::filesystem::path path(path_str);
+
+        auto process_file = [this](const std::filesystem::path& file_path) {
+            if (file_path.extension() != ".json") {
+                return;
+            }
+            spdlog::info("GUI: Tracing command history log: {}", file_path.string());
+            std::ifstream ifs(file_path);
+            if (!ifs) {
+                spdlog::error("Failed to open file: {}", file_path.string());
+                return;
+            }
+            const std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+
+            try {
+                struct Log {
+                    rfl::Field<"command", std::string> command;
+                    rfl::Field<"request", rfl::Generic> request;
+                };
+
+                auto parsed = rfl::json::read<Log>(content);
+                if (!parsed) {
+                    throw std::runtime_error(parsed.error().what());
+                }
+
+                const std::string& command_name = parsed->command();
+                const std::string request_json = rfl::json::write(parsed->request());
+
+                spdlog::info("GUI: Re-posting command '{}' from history with input: {}", command_name, request_json);
+                this->post_command(command_name, request_json);
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to parse or trace JSON from {}: {}", file_path.string(), e.what());
+            }
+        };
+
+        if (std::filesystem::is_directory(path)) {
+            std::vector<std::filesystem::path> files;
+            for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".json") {
+                    files.push_back(entry.path());
+                }
+            }
+            std::sort(files.begin(), files.end());
+            for (const auto& file_path : files) {
+                process_file(file_path);
+            }
+        } else {
+            spdlog::error("Path is not a valid directory for tracing history: {}", path_str);
         }
     }
 }

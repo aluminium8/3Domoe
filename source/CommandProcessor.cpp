@@ -9,9 +9,44 @@
 
 namespace MITSU_Domoe
 {
+    namespace {
+        void log_unresolved_command(uint64_t id, const std::string& command_name, const std::string& unresolved_json, const std::filesystem::path& command_history_path) {
+            std::stringstream ss;
+            ss << "{";
+            ss << "\"command\":\"" << command_name << "\",";
+            ss << "\"request\":" << unresolved_json;
+            ss << "}";
+
+            std::stringstream filename_ss;
+            filename_ss << std::setw(LOG_ID_PADDING) << std::setfill('0') << id
+                        << "_" << command_name << ".json";
+
+            try {
+                std::ofstream log_file(command_history_path / filename_ss.str());
+                if (log_file) {
+                    log_file << ss.str();
+                    spdlog::info("Successfully logged unresolved command {} to history.", id);
+                } else {
+                    spdlog::error("Failed to open command history file for writing: {}", (command_history_path / filename_ss.str()).string());
+                }
+            } catch (const std::exception& e) {
+                spdlog::error("Exception while writing to command history: {}", e.what());
+            }
+        }
+    }
 
     CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo, const std::filesystem::path &log_path)
-        : result_repo_(std::move(repo)), log_path_(log_path) {}
+        : result_repo_(std::move(repo)), log_path_(log_path) {
+            command_history_path_ = log_path_.parent_path() / "command_history";
+            try {
+                if (!std::filesystem::exists(command_history_path_)) {
+                    std::filesystem::create_directories(command_history_path_);
+                    spdlog::info("Created command_history directory at: {}", command_history_path_.string());
+                }
+            } catch (const std::filesystem::filesystem_error& e) {
+                spdlog::error("Failed to create command_history directory: {}", e.what());
+            }
+        }
 
     CommandProcessor::~CommandProcessor()
     {
@@ -62,16 +97,18 @@ namespace MITSU_Domoe
             ss << "{";
             ss << "\"id\":" << current_task.id << ",";
             ss << "\"command\":\"" << current_task.command_name << "\",";
-            ss << "\"request\":" << current_task.input_json << ",";
 
             if (const auto *success = std::get_if<SuccessResult>(&result))
             {
+                ss << "\"unresolved_request\":" << success->unresolved_input_json << ",";
+                ss << "\"request\":" << success->resolved_input_json << ",";
                 ss << "\"status\":\"success\",";
                 ss << "\"response\":" << success->output_json << ",";
                 ss << "\"schema\":" << rfl::json::write(success->output_schema);
             }
             else if (const auto *error = std::get_if<ErrorResult>(&result))
             {
+                ss << "\"request\":" << current_task.input_json << ",";
                 // A quick and dirty way to escape quotes in the error message
                 std::string error_msg = error->error_message;
                 std::string escaped_error_msg;
@@ -240,6 +277,7 @@ namespace MITSU_Domoe
     uint64_t CommandProcessor::add_to_queue(const std::string &command_name, const std::string &input_json)
     {
         const uint64_t id = next_command_id_++;
+        log_unresolved_command(id, command_name, input_json, command_history_path_);
         std::function<CommandResult()> task_logic;
 
         if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end())
@@ -249,7 +287,12 @@ namespace MITSU_Domoe
                 try
                 {
                     const std::string resolved_input_json = this->resolve_refs(input_json, command_name);
-                    return handler(resolved_input_json);
+                    CommandResult result = handler(resolved_input_json);
+                    if(auto* success = std::get_if<SuccessResult>(&result)) {
+                        success->unresolved_input_json = input_json;
+                        success->resolved_input_json = resolved_input_json;
+                    }
+                    return result;
                 }
                 catch (const std::exception &e)
                 {

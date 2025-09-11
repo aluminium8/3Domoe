@@ -102,14 +102,14 @@ namespace MITSU_Domoe
         }
     }
 
-    std::string CommandProcessor::resolve_refs(const std::string &input_json, const std::string &command_name_of_current_cmd)
+    std::string CommandProcessor::resolve_refs(const std::string &input_json, const std::string &command_name_of_current_cmd, uint64_t current_cmd_id)
     {
-        spdlog::debug("Starting reference resolution for: {}", input_json);
+        spdlog::debug("Starting reference resolution for command {}: {}", current_cmd_id, input_json);
 
-        const std::regex ref_regex(R"(\$ref:cmd\[(\d+)\]\.(\w+))");
+        const std::regex ref_regex(R"(\$ref:(?:cmd\[(\d+)\]|(latest)|prev\[(\d+)\])\.(\w+))");
         auto resolved_json = input_json;
 
-        const std::regex key_finder_regex(R"("\"(\w+)\"\s*:\s*\"?\$ref:cmd)"); // MODIFIED: `"`をオプショナルに
+        const std::regex key_finder_regex(R"("\"(\w+)\"\s*:\s*\"?\$ref:)");
         std::smatch key_match;
         std::string key_of_ref_field;
         if (std::regex_search(input_json, key_match, key_finder_regex) && key_match.size() > 1)
@@ -124,9 +124,38 @@ namespace MITSU_Domoe
         if (std::regex_search(resolved_json, match, ref_regex))
         {
             const std::string full_match_str = match[0].str();
-            const uint64_t cmd_id = std::stoull(match[1].str());
-            const std::string member_name = match[2].str();
-            spdlog::debug("Found reference: {}, cmd_id={}, member={}", full_match_str, cmd_id, member_name);
+            const std::string cmd_id_str = match[1].str();
+            const std::string latest_str = match[2].str();
+            const std::string prev_n_str = match[3].str();
+            const std::string member_name = match[4].str();
+
+            std::optional<uint64_t> cmd_id_opt;
+
+            if (!cmd_id_str.empty()) {
+                cmd_id_opt = std::stoull(cmd_id_str);
+                spdlog::debug("Found reference by ID: {}, cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
+            } else if (!latest_str.empty()) {
+                cmd_id_opt = result_repo_->get_latest_result_id(current_cmd_id);
+                if (!cmd_id_opt) {
+                    throw std::runtime_error("Reference 'latest' found, but no previous command exists.");
+                }
+                spdlog::debug("Found reference to latest command: {}, resolved cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
+            } else if (!prev_n_str.empty()) {
+                size_t n = std::stoull(prev_n_str);
+                if (n == 0) {
+                    throw std::runtime_error("Reference 'prev[0]' is invalid. Index must be 1 or greater.");
+                }
+                cmd_id_opt = result_repo_->get_nth_latest_result_id(n, current_cmd_id);
+                if (!cmd_id_opt) {
+                    throw std::runtime_error("Reference 'prev[" + std::to_string(n) + "]' not found.");
+                }
+                spdlog::debug("Found reference to {} previous command: {}, resolved cmd_id={}, member={}", n, full_match_str, *cmd_id_opt, member_name);
+            }
+
+            if (!cmd_id_opt) {
+                throw std::runtime_error("Could not resolve reference: " + full_match_str);
+            }
+            const uint64_t cmd_id = *cmd_id_opt;
 
             // Type Checking Logic
             if (!key_of_ref_field.empty())
@@ -244,11 +273,11 @@ namespace MITSU_Domoe
 
         if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end())
         {
-            task_logic = [this, handler = it->second.handler, input_json, command_name]
+        task_logic = [this, handler = it->second.handler, input_json, command_name, id]
             {
                 try
                 {
-                    const std::string resolved_input_json = this->resolve_refs(input_json, command_name);
+                const std::string resolved_input_json = this->resolve_refs(input_json, command_name, id);
                     return handler(resolved_input_json);
                 }
                 catch (const std::exception &e)

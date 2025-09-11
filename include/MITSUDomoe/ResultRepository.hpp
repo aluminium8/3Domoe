@@ -15,6 +15,8 @@ public:
     std::optional<CommandResult> get_result(uint64_t id);
     bool remove_result(uint64_t id);
     std::map<uint64_t, CommandResult> get_all_results() const;
+    std::optional<uint64_t> get_latest_result_id(uint64_t command_id_to_ignore) const;
+    std::optional<uint64_t> get_nth_latest_result_id(size_t n, uint64_t command_id_to_ignore) const;
 
 private:
     std::map<uint64_t, CommandResult> results_;

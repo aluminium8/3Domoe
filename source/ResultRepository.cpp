@@ -33,4 +33,30 @@ std::map<uint64_t, CommandResult> ResultRepository::get_all_results() const {
     return results_;
 }
 
+std::optional<uint64_t> ResultRepository::get_latest_result_id(uint64_t command_id_to_ignore) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto it = results_.rbegin(); it != results_.rend(); ++it) {
+        if (it->first < command_id_to_ignore) {
+            return it->first;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<uint64_t> ResultRepository::get_nth_latest_result_id(size_t n, uint64_t command_id_to_ignore) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<uint64_t> valid_ids;
+    for (const auto& pair : results_) {
+        if (pair.first < command_id_to_ignore) {
+            valid_ids.push_back(pair.first);
+        }
+    }
+
+    if (valid_ids.size() < n) {
+        return std::nullopt;
+    }
+
+    return valid_ids[valid_ids.size() - n];
+}
+
 } // namespace MITSU_Domoe

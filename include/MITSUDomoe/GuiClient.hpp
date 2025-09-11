@@ -39,9 +39,15 @@ public:
 
 private:
     void process_mesh_results();
+    void handle_load(const std::string& path_str);
+    void handle_trace(const std::string& path_str);
 
     ShaderManager shader_manager;
     std::map<std::pair<uint64_t, std::string>, MeshRenderState> mesh_render_states;
+
+    // UI State for Log Loader
+    char log_path_buffer[256] = {0};
+    std::string loaded_log_content;
 };
 
 }

@@ -24,6 +24,7 @@
 
 #include <rfl.hpp>
 #include <rfl_eigen_serdes.hpp>
+#include <fstream>
 
 namespace
 {
@@ -255,6 +256,24 @@ void GuiClient::process_mesh_results() {
                 {
                     ImGui::Text("No commands registered.");
                 }
+
+                ImGui::Separator();
+                ImGui::Text("Log Playback");
+                ImGui::InputText("Log Path", log_path_buffer, sizeof(log_path_buffer));
+                if (ImGui::Button("Load Log")) {
+                    handle_load(log_path_buffer);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Trace Log")) {
+                    handle_trace(log_path_buffer);
+                }
+
+                if (!loaded_log_content.empty()) {
+                    ImGui::Separator();
+                    ImGui::Text("Loaded Log Content:");
+                    ImGui::InputTextMultiline("##loaded_log", &loaded_log_content[0], loaded_log_content.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 16), ImGuiInputTextFlags_ReadOnly);
+                }
+
 
                 ImGui::End();
             }
@@ -537,4 +556,101 @@ void GuiClient::process_mesh_results() {
         glfwTerminate();
     }
 
+    void GuiClient::handle_load(const std::string& path_str) {
+        const std::filesystem::path path(path_str);
+        loaded_log_content.clear();
+
+        auto process_file = [this](const std::filesystem::path& file_path) {
+            if (file_path.extension() != ".json") {
+                return;
+            }
+            spdlog::info("GUI: Loading log: {}", file_path.string());
+            std::ifstream ifs(file_path);
+            if (!ifs) {
+                spdlog::error("Failed to open file: {}", file_path.string());
+                return;
+            }
+            const std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+
+            try {
+                auto parsed = rfl::json::read<rfl::Generic>(content);
+                if (!parsed) {
+                    throw std::runtime_error(parsed.error().what());
+                }
+                const auto pretty_json = rfl::json::write(*parsed, YYJSON_WRITE_PRETTY);
+                loaded_log_content += "--- " + file_path.filename().string() + " ---\n";
+                loaded_log_content += pretty_json;
+                loaded_log_content += "\n\n";
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to parse or print JSON from {}: {}", file_path.string(), e.what());
+            }
+        };
+
+        if (std::filesystem::is_directory(path)) {
+            for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                if (entry.is_regular_file()) {
+                    process_file(entry.path());
+                }
+            }
+        } else if (std::filesystem::is_regular_file(path)) {
+            process_file(path);
+        } else {
+            spdlog::error("Path is not a valid file or directory: {}", path_str);
+        }
+    }
+
+    void GuiClient::handle_trace(const std::string& path_str) {
+        const std::filesystem::path path(path_str);
+
+        auto process_file = [this](const std::filesystem::path& file_path) {
+            if (file_path.extension() != ".json") {
+                return;
+            }
+            spdlog::info("GUI: Tracing log: {}", file_path.string());
+            std::ifstream ifs(file_path);
+            if (!ifs) {
+                spdlog::error("Failed to open file: {}", file_path.string());
+                return;
+            }
+            const std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+
+            try {
+                struct Log {
+                    rfl::Field<"command", std::string> command;
+                    rfl::Field<"request", rfl::Generic> request;
+                };
+
+                auto parsed = rfl::json::read<Log>(content);
+                if (!parsed) {
+                    throw std::runtime_error(parsed.error().what());
+                }
+
+                const std::string& command_name = parsed->command();
+                const std::string request_json = rfl::json::write(parsed->request());
+
+                spdlog::info("GUI: Re-posting command '{}' with input: {}", command_name, request_json);
+                this->post_command(command_name, request_json);
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to parse or trace JSON from {}: {}", file_path.string(), e.what());
+            }
+        };
+
+        if (std::filesystem::is_directory(path)) {
+            std::vector<std::filesystem::path> files;
+            for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".json") {
+                    files.push_back(entry.path());
+                }
+            }
+            std::sort(files.begin(), files.end());
+            for (const auto& file_path : files) {
+                process_file(file_path);
+            }
+        } else if (std::filesystem::is_regular_file(path)) {
+            process_file(path);
+        } else {
+            spdlog::error("Path is not a valid file or directory: {}", path_str);
+        }
+    }
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "BaseClient.hpp"
+#include <vector>
+#include <string>
 
 namespace MITSU_Domoe
 {
@@ -14,6 +16,12 @@ public:
     ~ConsoleClient() = default;
 
     void run() override;
+
+private:
+    void print_help();
+    void run_tests();
+    void handle_load(const std::string& path_str);
+    void handle_trace(const std::string& path_str);
 };
 
 }

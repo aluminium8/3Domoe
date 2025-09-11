@@ -325,7 +325,7 @@ namespace MITSU_Domoe
             spdlog::info("Successfully loaded error result for command ID {} from log.", log.id());
 
         } else {
-            spdlog::warn("Could not load result from log for command ID {}: Status was not 'success' with a schema, or 'error'.", log.id());
+            spdlog::warn("Log for command ID {} could not be loaded. A 'success' status requires a 'schema' field, which was not found. This may be an old log file format.", log.id());
         }
     }
 

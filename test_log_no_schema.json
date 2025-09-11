@@ -1,0 +1,12 @@
+{
+    "id": 100,
+    "command": "BIGprocess_mock",
+    "request": {
+        "time_to_process": 1
+    },
+    "status": "success",
+    "response": {
+        "time_slept": 1,
+        "message": "Successfully slept"
+    }
+}

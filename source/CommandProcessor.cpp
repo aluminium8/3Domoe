@@ -9,8 +9,10 @@
 
 namespace MITSU_Domoe
 {
-    namespace {
-        void log_unresolved_command(uint64_t id, const std::string& command_name, const std::string& unresolved_json, const std::filesystem::path& command_history_path) {
+    namespace
+    {
+        void log_unresolved_command(uint64_t id, const std::string &command_name, const std::string &unresolved_json, const std::filesystem::path &command_history_path)
+        {
             std::stringstream ss;
             ss << "{";
             ss << "\"command\":\"" << command_name << "\",";
@@ -21,32 +23,43 @@ namespace MITSU_Domoe
             filename_ss << std::setw(LOG_ID_PADDING) << std::setfill('0') << id
                         << "_" << command_name << ".json";
 
-            try {
+            try
+            {
                 std::ofstream log_file(command_history_path / filename_ss.str());
-                if (log_file) {
+                if (log_file)
+                {
                     log_file << ss.str();
                     spdlog::info("Successfully logged unresolved command {} to history.", id);
-                } else {
+                }
+                else
+                {
                     spdlog::error("Failed to open command history file for writing: {}", (command_history_path / filename_ss.str()).string());
                 }
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 spdlog::error("Exception while writing to command history: {}", e.what());
             }
         }
     }
 
     CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo, const std::filesystem::path &log_path)
-        : result_repo_(std::move(repo)), log_path_(log_path) {
-            command_history_path_ = log_path_ / "command_history";
-            try {
-                if (!std::filesystem::exists(command_history_path_)) {
-                    std::filesystem::create_directories(command_history_path_);
-                    spdlog::info("Created command_history directory at: {}", command_history_path_.string());
-                }
-            } catch (const std::filesystem::filesystem_error& e) {
-                spdlog::error("Failed to create command_history directory: {}", e.what());
+        : result_repo_(std::move(repo)), log_path_(log_path)
+    {
+        command_history_path_ = log_path_ / "command_history";
+        try
+        {
+            if (!std::filesystem::exists(command_history_path_))
+            {
+                std::filesystem::create_directories(command_history_path_);
+                spdlog::info("Created command_history directory at: {}", command_history_path_.string());
             }
         }
+        catch (const std::filesystem::filesystem_error &e)
+        {
+            spdlog::error("Failed to create command_history directory: {}", e.what());
+        }
+    }
 
     CommandProcessor::~CommandProcessor()
     {
@@ -168,28 +181,37 @@ namespace MITSU_Domoe
 
             std::optional<uint64_t> cmd_id_opt;
 
-            if (!cmd_id_str.empty()) {
+            if (!cmd_id_str.empty())
+            {
                 cmd_id_opt = std::stoull(cmd_id_str);
                 spdlog::debug("Found reference by ID: {}, cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
-            } else if (!latest_str.empty()) {
+            }
+            else if (!latest_str.empty())
+            {
                 cmd_id_opt = result_repo_->get_latest_result_id(current_cmd_id);
-                if (!cmd_id_opt) {
+                if (!cmd_id_opt)
+                {
                     throw std::runtime_error("Reference 'latest' found, but no previous command exists.");
                 }
                 spdlog::debug("Found reference to latest command: {}, resolved cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
-            } else if (!prev_n_str.empty()) {
+            }
+            else if (!prev_n_str.empty())
+            {
                 size_t n = std::stoull(prev_n_str);
-                if (n == 0) {
+                if (n == 0)
+                {
                     throw std::runtime_error("Reference 'prev[0]' is invalid. Index must be 1 or greater.");
                 }
                 cmd_id_opt = result_repo_->get_nth_latest_result_id(n, current_cmd_id);
-                if (!cmd_id_opt) {
+                if (!cmd_id_opt)
+                {
                     throw std::runtime_error("Reference 'prev[" + std::to_string(n) + "]' not found.");
                 }
                 spdlog::debug("Found reference to {} previous command: {}, resolved cmd_id={}, member={}", n, full_match_str, *cmd_id_opt, member_name);
             }
 
-            if (!cmd_id_opt) {
+            if (!cmd_id_opt)
+            {
                 throw std::runtime_error("Could not resolve reference: " + full_match_str);
             }
             const uint64_t cmd_id = *cmd_id_opt;
@@ -299,7 +321,19 @@ namespace MITSU_Domoe
             // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         }
 
-        spdlog::debug("Reference resolution finished. Final JSON: {}", resolved_json);
+        const size_t max_display_length = 256;
+        std::string resolved_json_for_display = resolved_json; // 表示用の文字列を準備
+
+        // もし元の文字列が256文字より長ければ
+        if (resolved_json.size() > max_display_length)
+        {
+            // 表示用文字列を256文字で切り取り、末尾に "..." を追加
+            resolved_json_for_display = resolved_json.substr(0,max_display_length) + "...";
+
+            spdlog::debug("json trancated {} to {}", resolved_json.size(), resolved_json_for_display.size());
+        }
+
+        spdlog::debug("Reference resolution finished. Final JSON: {}", resolved_json_for_display);
         return resolved_json;
     }
 
@@ -311,19 +345,19 @@ namespace MITSU_Domoe
 
         if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end())
         {
-        task_logic = [this, handler = it->second.handler, input_json, command_name, id]
+            task_logic = [this, handler = it->second.handler, input_json, command_name, id]
             {
                 try
                 {
 
-                    const std::string resolved_input_json = this->resolve_refs(input_json, command_name,id);
+                    const std::string resolved_input_json = this->resolve_refs(input_json, command_name, id);
                     CommandResult result = handler(resolved_input_json);
-                    if(auto* success = std::get_if<SuccessResult>(&result)) {
+                    if (auto *success = std::get_if<SuccessResult>(&result))
+                    {
                         success->unresolved_input_json = input_json;
                         success->resolved_input_json = resolved_input_json;
                     }
                     return result;
-
                 }
                 catch (const std::exception &e)
                 {
@@ -393,7 +427,7 @@ namespace MITSU_Domoe
 
         const auto &log = *parsed_log;
         spdlog::info("request: {}", rfl::json::write(log.request()));
-        
+
         spdlog::info("response: {}", rfl::json::write(log.response()));
 
         if (log.status() == "success" && log.schema())
@@ -402,7 +436,7 @@ namespace MITSU_Domoe
             success.command_name = log.command();
             success.output_json = rfl::json::write(log.response());
             success.output_schema = *log.schema();
-            
+
             // input_raw and output_raw are left empty as they are not needed for tracing.
 
             result_repo_->store_result(log.id(), std::move(success));

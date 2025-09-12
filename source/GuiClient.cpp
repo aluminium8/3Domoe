@@ -21,6 +21,8 @@
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
 #include "CutMeshCartridge.hpp"
+#include "SubdividePolygonCartridge.hpp"
+
 
 #include <rfl.hpp>
 #include <rfl_eigen_serdes.hpp>
@@ -45,6 +47,8 @@ namespace MITSU_Domoe
         processor->register_cartridge(BIGprocess_mock_cartridge{});
         processor->register_cartridge(Need_many_arg_mock_cartridge{});
         processor->register_cartridge(CutMeshCartridge{});
+        processor->register_cartridge(SubdividePolygonCartridge{});
+        
     }
 
     void GuiClient::process_mesh_results()

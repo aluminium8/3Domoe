@@ -24,6 +24,8 @@ public:
     struct Output
     {
         rfl::Field<"output_polygon_mesh", MITSU_Domoe::Polygon_mesh> output_polygon_mesh;
+        rfl::Field<"num_faces_before", int> polygon_num_origin;
+        rfl::Field<"num_faces_after", int> polygon_num_subdivided ;
         rfl::Field<"message", std::string> message;
     };
 
@@ -36,6 +38,8 @@ public:
         Eigen::MatrixXi F = input.input_polygon_mesh.get().F;
         const double r = input.r.get();
         const double r_squared = r * r;
+
+        const int num_faces_before = F.rows();
 
         std::vector<Eigen::RowVector3d> V_vec;
         for (long i = 0; i < V.rows(); ++i)
@@ -125,9 +129,11 @@ public:
         {
             F_out.row(i) = F_final_vec[i];
         }
-
+        const int num_faces_after = F_out.rows();
         return Output{
             .output_polygon_mesh = MITSU_Domoe::Polygon_mesh{V_out, F_out, {}},
+            .polygon_num_origin = num_faces_before,
+            .polygon_num_subdivided = num_faces_after,
             .message = "Successfully subdivided mesh. Original faces: " + std::to_string(F.rows()) + ", new faces: " + std::to_string(F_out.rows())};
     }
 };

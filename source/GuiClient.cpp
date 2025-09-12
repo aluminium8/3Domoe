@@ -22,6 +22,7 @@
 #include "Need_many_arg_mock_cartridge.hpp"
 #include "CutMeshCartridge.hpp"
 #include "SubdividePolygonCartridge.hpp"
+#include "UseParamsCartridge.hpp"
 
 
 #include <rfl.hpp>
@@ -48,7 +49,7 @@ namespace MITSU_Domoe
         processor->register_cartridge(Need_many_arg_mock_cartridge{});
         processor->register_cartridge(CutMeshCartridge{});
         processor->register_cartridge(SubdividePolygonCartridge{});
-        
+        processor->register_cartridge(UseParamsCartridge{});
     }
 
     void GuiClient::process_mesh_results()
@@ -269,6 +270,23 @@ namespace MITSU_Domoe
                 else
                 {
                     ImGui::Text("No commands registered.");
+                }
+
+                ImGui::Separator();
+
+                ImGui::Text("Parameter Loading");
+                static char param_path_buffer[256] = {0};
+                ImGui::InputText("Parameter Path", param_path_buffer, sizeof(param_path_buffer));
+                if (ImGui::Button("Load Params"))
+                {
+                    if (strlen(param_path_buffer) > 0)
+                    {
+                        processor->load_json_from_file(param_path_buffer);
+                    }
+                    else
+                    {
+                        spdlog::warn("Parameter file path is empty.");
+                    }
                 }
 
                 ImGui::Separator();

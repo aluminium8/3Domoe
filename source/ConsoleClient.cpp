@@ -13,6 +13,7 @@
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
 #include "SubdividePolygonCartridge.hpp"
+#include "UseParamsCartridge.hpp"
 
 namespace
 {
@@ -47,6 +48,7 @@ ConsoleClient::ConsoleClient(const std::filesystem::path& log_path) : BaseClient
     processor->register_cartridge(BIGprocess_mock_cartridge{});
     processor->register_cartridge(Need_many_arg_mock_cartridge{});
     processor->register_cartridge(SubdividePolygonCartridge{});
+    processor->register_cartridge(UseParamsCartridge{});
 }
 
 void ConsoleClient::run()
@@ -89,6 +91,15 @@ void ConsoleClient::run()
             } else {
                 handle_trace(path);
             }
+        } else if (command == "load_params") {
+            std::string path;
+            ss >> path;
+            if (path.empty()) {
+                spdlog::error("Usage: load_params <filepath>");
+            } else {
+                uint64_t id = processor->load_json_from_file(path);
+                spdlog::info("Loaded parameters from {} as command ID {}", path, id);
+            }
         } else if (command.empty()) {
             // do nothing
         }
@@ -105,6 +116,7 @@ void ConsoleClient::print_help() {
               << "Available commands:\n"
               << "  load <path>      - Loads and displays a JSON log file or all logs in a directory.\n"
               << "  trace <path>     - Re-runs the command from a JSON log file or all logs in a directory.\n"
+              << "  load_params <path> - Loads a JSON file as a parameter set, making it available for $ref.\n"
               << "  run_tests        - Runs the original hardcoded test suite.\n"
               << "  help             - Displays this help message.\n"
               << "  exit             - Exits the application.\n"
@@ -163,6 +175,18 @@ void ConsoleClient::run_tests() {
     }
 
     spdlog::info("Main thread: All test cases finished.");
+
+    spdlog::info("\n--- Test Case: Loading parameters from file and using them ---");
+    uint64_t load_params_id = processor->load_json_from_file("params.json");
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // allow file to be processed
+    print_result(load_params_id, get_result(load_params_id));
+
+    const std::string use_params_input =
+        R"({"message": "$ref:cmd[)" + std::to_string(load_params_id) + R"(].message", "value": $ref:cmd[)" + std::to_string(load_params_id) + R"(].value})";
+    uint64_t use_params_id = post_command("useParams", use_params_input);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    print_result(use_params_id, get_result(use_params_id));
 }
 
 void ConsoleClient::handle_load(const std::string& path_str) {

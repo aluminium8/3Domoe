@@ -168,10 +168,8 @@ namespace MITSU_Domoe
         }
 
         std::smatch match;
-        // NOTE: この実装はJSON内に複数の$refがある場合、正しく動作しない可能性がある
-        //       regex_searchは文字列の先頭から検索するため、置換によって文字列長が変わると
-        //       後続の検索に影響が出る。今回は$refが1つと仮定する。
-        if (std::regex_search(resolved_json, match, ref_regex))
+        std::string::const_iterator search_start(resolved_json.cbegin());
+        while (std::regex_search(search_start, resolved_json.cend(), match, ref_regex))
         {
             const std::string full_match_str = match[0].str();
             const std::string cmd_id_str = match[1].str();
@@ -309,16 +307,15 @@ namespace MITSU_Domoe
             if (pos != std::string::npos)
             {
                 resolved_json.replace(pos, target_to_replace.length(), member_json);
-                spdlog::debug("Replacement complete.");
+                spdlog::debug("Replacement complete. New json: {}", resolved_json);
+                search_start = resolved_json.cbegin() + pos + member_json.length();
             }
             else
             {
                 spdlog::warn("Could not find the reference string '{}' (with or without quotes) for replacement.", full_match_str);
+                // If not found, advance the search position to avoid an infinite loop
+                search_start = match.suffix().first;
             }
-
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-            // ▲▲▲ ここまでが修正箇所 ▲▲▲
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         }
 
         const size_t max_display_length = 256;
@@ -462,6 +459,70 @@ namespace MITSU_Domoe
         {
             spdlog::warn("Log for command ID {} could not be loaded. A 'success' status requires a 'schema' field, which was not found. This may be an old log file format.", log.id());
         }
+    }
+
+    uint64_t CommandProcessor::load_json_from_file(const std::filesystem::path &file_path)
+    {
+        const uint64_t id = next_command_id_++;
+        spdlog::info("Attempting to load JSON from file: {}", file_path.string());
+
+        std::ifstream file_stream(file_path);
+        if (!file_stream)
+        {
+            const std::string err_msg = "Failed to open file: " + file_path.string();
+            spdlog::error(err_msg);
+            result_repo_->store_result(id, ErrorResult{err_msg});
+            return id;
+        }
+
+        const std::string json_content((std::istreambuf_iterator<char>(file_stream)), std::istreambuf_iterator<char>());
+
+        yyjson_doc *doc = yyjson_read(json_content.c_str(), json_content.length(), 0);
+        if (!doc)
+        {
+            const std::string err_msg = "Failed to parse JSON content from file: " + file_path.string();
+            spdlog::error(err_msg);
+            result_repo_->store_result(id, ErrorResult{err_msg});
+            return id;
+        }
+
+        yyjson_val *root = yyjson_doc_get_root(doc);
+        if (!yyjson_is_obj(root))
+        {
+            yyjson_doc_free(doc);
+            const std::string err_msg = "JSON content from file " + file_path.string() + " is not an object.";
+            spdlog::error(err_msg);
+            result_repo_->store_result(id, ErrorResult{err_msg});
+            return id;
+        }
+
+        std::map<std::string, std::string> schema;
+        yyjson_obj_iter iter;
+        yyjson_obj_iter_init(root, &iter);
+        yyjson_val *key, *val;
+        while ((key = yyjson_obj_iter_next(&iter)))
+        {
+            val = yyjson_obj_iter_get_val(key);
+            const char *key_str = yyjson_get_str(key);
+            const char *type_str = yyjson_get_type_desc(val);
+            schema[key_str] = type_str;
+        }
+
+        yyjson_doc_free(doc);
+
+        SuccessResult result;
+        result.command_name = "LOADED_JSON";
+        result.output_json = json_content;
+        result.output_schema = schema;
+        // input_raw and output_raw are not strictly necessary for this "command"
+        // but we fill them for consistency.
+        result.unresolved_input_json = file_path.string();
+        result.resolved_input_json = file_path.string();
+
+        result_repo_->store_result(id, std::move(result));
+        spdlog::info("Successfully loaded JSON from {} as command ID {}", file_path.string(), id);
+
+        return id;
     }
 
 } // namespace MITSU_Domoe

@@ -13,6 +13,8 @@
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
 #include "SubdividePolygonCartridge.hpp"
+#include "LoadParamsCartridge.hpp"
+#include "CalculateAreaCartridge.hpp"
 
 namespace
 {
@@ -47,6 +49,14 @@ ConsoleClient::ConsoleClient(const std::filesystem::path& log_path) : BaseClient
     processor->register_cartridge(BIGprocess_mock_cartridge{});
     processor->register_cartridge(Need_many_arg_mock_cartridge{});
     processor->register_cartridge(SubdividePolygonCartridge{});
+
+    LoadParamsCartridge load_params_cartridge;
+    load_params_cartridge.load_func = [this](const std::filesystem::path& p) {
+        return this->processor->load_parameters_from_file(p);
+    };
+    processor->register_cartridge(load_params_cartridge);
+
+    processor->register_cartridge(CalculateAreaCartridge{});
 }
 
 void ConsoleClient::run()
@@ -163,6 +173,26 @@ void ConsoleClient::run_tests() {
     }
 
     spdlog::info("Main thread: All test cases finished.");
+
+    spdlog::info("\n--- Test Case: Loading parameters from file ---");
+
+    // Load parameters from JSON file
+    const std::string load_params_input = R"({"file_path": "sample/resource/rectangle_params.json"})";
+    uint64_t load_params_id = post_command("load_params", load_params_input);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // Give time for the command to execute
+    print_result(load_params_id, get_result(load_params_id));
+
+    // Run calculate_area command using references to the loaded parameters
+    const std::string calculate_area_input = R"({
+        "length": "$ref:rectangle_params.json#/dimensions/length",
+        "width": "$ref:rectangle_params.json#/dimensions/width"
+    })";
+
+    uint64_t calculate_area_id = post_command("calculate_area", calculate_area_input);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    print_result(calculate_area_id, get_result(calculate_area_id));
 }
 
 void ConsoleClient::handle_load(const std::string& path_str) {

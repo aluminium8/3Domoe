@@ -99,6 +99,7 @@ namespace MITSU_Domoe
 
         uint64_t add_to_queue(const std::string &command_name, const std::string &input_json);
         void load_result_from_log(const std::string& json_content);
+        uint64_t load_parameters_from_file(const std::filesystem::path& file_path);
         void start();
         void stop();
 

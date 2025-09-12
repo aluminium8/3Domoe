@@ -156,180 +156,197 @@ namespace MITSU_Domoe
     {
         spdlog::debug("Starting reference resolution for command {}: {}", current_cmd_id, input_json);
 
-        const std::regex ref_regex(R"(\$ref:(?:cmd\[(\d+)\]|(latest)|prev\[(\d+)\])\.(\w+))");
         auto resolved_json = input_json;
 
-        const std::regex key_finder_regex(R"("\"(\w+)\"\s*:\s*\"?\$ref:)");
-        std::smatch key_match;
-        std::string key_of_ref_field;
-        if (std::regex_search(input_json, key_match, key_finder_regex) && key_match.size() > 1)
-        {
-            key_of_ref_field = key_match[1].str();
-        }
+        while (true) {
+            const std::regex ref_regex(R"(\$ref:(?:cmd\[(\d+)\]|(latest)|prev\[(\d+)\])\.(\w+))");
+            const std::regex file_ref_regex(R"(\$ref:([a-zA-Z0-9_.-]+\.json)#([/\w.-]+))");
 
-        std::smatch match;
-        // NOTE: この実装はJSON内に複数の$refがある場合、正しく動作しない可能性がある
-        //       regex_searchは文字列の先頭から検索するため、置換によって文字列長が変わると
-        //       後続の検索に影響が出る。今回は$refが1つと仮定する。
-        if (std::regex_search(resolved_json, match, ref_regex))
-        {
-            const std::string full_match_str = match[0].str();
-            const std::string cmd_id_str = match[1].str();
-            const std::string latest_str = match[2].str();
-            const std::string prev_n_str = match[3].str();
-            const std::string member_name = match[4].str();
+            std::smatch match;
+            bool found_ref = false;
 
-            std::optional<uint64_t> cmd_id_opt;
+            if (std::regex_search(resolved_json, match, ref_regex)) {
+                found_ref = true;
+                const std::string full_match_str = match[0].str();
+                const std::string cmd_id_str = match[1].str();
+                const std::string latest_str = match[2].str();
+                const std::string prev_n_str = match[3].str();
+                const std::string member_name = match[4].str();
 
-            if (!cmd_id_str.empty())
-            {
-                cmd_id_opt = std::stoull(cmd_id_str);
-                spdlog::debug("Found reference by ID: {}, cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
-            }
-            else if (!latest_str.empty())
-            {
-                cmd_id_opt = result_repo_->get_latest_result_id(current_cmd_id);
-                if (!cmd_id_opt)
+                std::optional<uint64_t> cmd_id_opt;
+
+                if (!cmd_id_str.empty())
                 {
-                    throw std::runtime_error("Reference 'latest' found, but no previous command exists.");
+                    cmd_id_opt = std::stoull(cmd_id_str);
+                    spdlog::debug("Found reference by ID: {}, cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
                 }
-                spdlog::debug("Found reference to latest command: {}, resolved cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
-            }
-            else if (!prev_n_str.empty())
-            {
-                size_t n = std::stoull(prev_n_str);
-                if (n == 0)
+                else if (!latest_str.empty())
                 {
-                    throw std::runtime_error("Reference 'prev[0]' is invalid. Index must be 1 or greater.");
-                }
-                cmd_id_opt = result_repo_->get_nth_latest_result_id(n, current_cmd_id);
-                if (!cmd_id_opt)
-                {
-                    throw std::runtime_error("Reference 'prev[" + std::to_string(n) + "]' not found.");
-                }
-                spdlog::debug("Found reference to {} previous command: {}, resolved cmd_id={}, member={}", n, full_match_str, *cmd_id_opt, member_name);
-            }
-
-            if (!cmd_id_opt)
-            {
-                throw std::runtime_error("Could not resolve reference: " + full_match_str);
-            }
-            const uint64_t cmd_id = *cmd_id_opt;
-
-            // Type Checking Logic
-            if (!key_of_ref_field.empty())
-            {
-                // (この部分は変更なし)
-                spdlog::debug("Performing type check for field '{}'...", key_of_ref_field);
-                const auto &current_cartridge_info = cartridge_manager.at(command_name_of_current_cmd);
-                const auto &expected_type = current_cartridge_info.input_schema.arg_names_to_type.at(key_of_ref_field);
-
-                auto referenced_result = result_repo_->get_result(cmd_id);
-                if (referenced_result && std::holds_alternative<SuccessResult>(*referenced_result))
-                {
-                    const auto &success_result = std::get<SuccessResult>(*referenced_result);
-                    const auto &actual_type = success_result.output_schema.at(member_name);
-                    if (expected_type != actual_type)
+                    cmd_id_opt = result_repo_->get_latest_result_id(current_cmd_id);
+                    if (!cmd_id_opt)
                     {
-                        throw std::runtime_error("Type mismatch for field '" + key_of_ref_field + "'. Expected " + expected_type + " but got " + actual_type + ".");
+                        throw std::runtime_error("Reference 'latest' found, but no previous command exists.");
                     }
-                    spdlog::debug("Type check passed. Expected '{}', got '{}'", expected_type, actual_type);
+                    spdlog::debug("Found reference to latest command: {}, resolved cmd_id={}, member={}", full_match_str, *cmd_id_opt, member_name);
                 }
-            }
-
-            auto result = result_repo_->get_result(cmd_id);
-            if (!result)
-            {
-                throw std::runtime_error("Referenced command with ID " + std::to_string(cmd_id) + " not found.");
-            }
-            spdlog::debug("Successfully retrieved result for command ID {}", cmd_id);
-
-            auto success_result = std::get_if<SuccessResult>(&(*result));
-            if (!success_result)
-            {
-                throw std::runtime_error("Referenced command with ID " + std::to_string(cmd_id) + " failed.");
-            }
-
-            yyjson_doc *doc = yyjson_read(success_result->output_json.c_str(), success_result->output_json.length(), 0);
-            if (!doc)
-            {
-                throw std::runtime_error("Failed to parse output JSON for command ID " + std::to_string(cmd_id));
-            }
-            spdlog::debug("Successfully parsed referenced JSON document.");
-
-            yyjson_val *root = yyjson_doc_get_root(doc);
-            if (!yyjson_is_obj(root))
-            {
-                yyjson_doc_free(doc);
-                throw std::runtime_error("Output of command ID " + std::to_string(cmd_id) + " is not a JSON object.");
-            }
-
-            yyjson_val *member_val = yyjson_obj_get(root, member_name.c_str());
-            if (!member_val)
-            {
-                yyjson_doc_free(doc);
-                throw std::runtime_error("Member '" + member_name + "' not found in output of command ID " + std::to_string(cmd_id));
-            }
-            spdlog::debug("Successfully found member '{}' in JSON.", member_name);
-
-            const char *member_json_c_str = yyjson_val_write(member_val, 0, NULL);
-            if (!member_json_c_str)
-            {
-                yyjson_doc_free(doc);
-                throw std::runtime_error("Failed to write member '" + member_name + "' to string (yyjson_val_write returned null).");
-            }
-            spdlog::debug("Successfully created member JSON string.");
-            std::string member_json(member_json_c_str);
-            free((void *)member_json_c_str);
-            yyjson_doc_free(doc);
-
-            // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-            // ▼▼▼ ここからが修正箇所 ▼▼▼
-            // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-
-            // 最初にダブルクオーテーション付きの参照文字列を検索
-            std::string target_to_replace = "\"" + full_match_str + "\"";
-            size_t pos = resolved_json.find(target_to_replace);
-
-            // 見つからなかった場合、ダブルクオーテーションなしの参照文字列を検索
-            if (pos == std::string::npos)
-            {
-                target_to_replace = full_match_str; // 検索対象をクオートなしに変更
-                pos = resolved_json.find(target_to_replace);
-                if (pos != std::string::npos)
+                else if (!prev_n_str.empty())
                 {
-                    spdlog::debug("Found unquoted reference, will replace it.");
+                    size_t n = std::stoull(prev_n_str);
+                    if (n == 0)
+                    {
+                        throw std::runtime_error("Reference 'prev[0]' is invalid. Index must be 1 or greater.");
+                    }
+                    cmd_id_opt = result_repo_->get_nth_latest_result_id(n, current_cmd_id);
+                    if (!cmd_id_opt)
+                    {
+                        throw std::runtime_error("Reference 'prev[" + std::to_string(n) + "]' not found.");
+                    }
+                    spdlog::debug("Found reference to {} previous command: {}, resolved cmd_id={}, member={}", n, full_match_str, *cmd_id_opt, member_name);
+                }
+
+                if (!cmd_id_opt)
+                {
+                    throw std::runtime_error("Could not resolve reference: " + full_match_str);
+                }
+                const uint64_t cmd_id = *cmd_id_opt;
+
+                auto result = result_repo_->get_result(cmd_id);
+                if (!result)
+                {
+                    throw std::runtime_error("Referenced command with ID " + std::to_string(cmd_id) + " not found.");
+                }
+                spdlog::debug("Successfully retrieved result for command ID {}", cmd_id);
+
+                auto success_result = std::get_if<SuccessResult>(&(*result));
+                if (!success_result)
+                {
+                    throw std::runtime_error("Referenced command with ID " + std::to_string(cmd_id) + " failed.");
+                }
+
+                yyjson_doc *doc = yyjson_read(success_result->output_json.c_str(), success_result->output_json.length(), 0);
+                if (!doc)
+                {
+                    throw std::runtime_error("Failed to parse output JSON for command ID " + std::to_string(cmd_id));
+                }
+                spdlog::debug("Successfully parsed referenced JSON document.");
+
+                yyjson_val *root = yyjson_doc_get_root(doc);
+                if (!yyjson_is_obj(root))
+                {
+                    yyjson_doc_free(doc);
+                    throw std::runtime_error("Output of command ID " + std::to_string(cmd_id) + " is not a JSON object.");
+                }
+
+                yyjson_val *member_val = yyjson_obj_get(root, member_name.c_str());
+                if (!member_val)
+                {
+                    yyjson_doc_free(doc);
+                    throw std::runtime_error("Member '" + member_name + "' not found in output of command ID " + std::to_string(cmd_id));
+                }
+                spdlog::debug("Successfully found member '{}' in JSON.", member_name);
+
+                const char *member_json_c_str = yyjson_val_write(member_val, 0, NULL);
+                if (!member_json_c_str)
+                {
+                    yyjson_doc_free(doc);
+                    throw std::runtime_error("Failed to write member '" + member_name + "' to string (yyjson_val_write returned null).");
+                }
+                spdlog::debug("Successfully created member JSON string.");
+                std::string member_json(member_json_c_str);
+                free((void *)member_json_c_str);
+                yyjson_doc_free(doc);
+
+                std::string target_to_replace = "\"" + full_match_str + "\"";
+                size_t pos = resolved_json.find(target_to_replace);
+
+                if (pos == std::string::npos)
+                {
+                    target_to_replace = full_match_str;
+                    pos = resolved_json.find(target_to_replace);
+                }
+
+                if (pos != std::string::npos) {
+                    resolved_json.replace(pos, target_to_replace.length(), member_json);
+                } else {
+                    spdlog::warn("Could not find the reference string '{}' for replacement.", full_match_str);
+                }
+
+            } else if (std::regex_search(resolved_json, match, file_ref_regex)) {
+                found_ref = true;
+                const std::string full_match_str = match[0].str();
+                const std::string filename = match[1].str();
+                const std::string json_pointer = match[2].str();
+
+                spdlog::debug("Found file reference: filename={}, pointer={}", filename, json_pointer);
+
+                std::optional<uint64_t> param_id_opt;
+                std::optional<SuccessResult> param_result_opt;
+
+                auto all_results = result_repo_->get_all_results();
+                for (const auto& [id, result] : all_results) {
+                    if (const auto* success = std::get_if<SuccessResult>(&result)) {
+                        if (success->command_name == filename) {
+                            param_id_opt = id;
+                            param_result_opt = *success;
+                            break;
+                        }
+                    }
+                }
+
+                if (!param_id_opt) {
+                    throw std::runtime_error("Referenced parameter file '" + filename + "' not found or not loaded.");
+                }
+
+                const auto& param_result = *param_result_opt;
+
+                yyjson_doc* doc = yyjson_read(param_result.output_json.c_str(), param_result.output_json.length(), 0);
+                if (!doc) {
+                    throw std::runtime_error("Failed to parse JSON for parameter file '" + filename + "'");
+                }
+
+                yyjson_val* root = yyjson_doc_get_root(doc);
+                yyjson_val* value_at_pointer = yyjson_ptr_get(root, json_pointer.c_str());
+
+                if (!value_at_pointer) {
+                    yyjson_doc_free(doc);
+                    throw std::runtime_error("JSON Pointer '" + json_pointer + "' not found in parameter file '" + filename + "'");
+                }
+
+                const char* value_json_c_str = yyjson_val_write(value_at_pointer, 0, NULL);
+                if (!value_json_c_str) {
+                    yyjson_doc_free(doc);
+                    throw std::runtime_error("Failed to write value from JSON pointer to string.");
+                }
+
+                std::string value_json(value_json_c_str);
+                free((void*)value_json_c_str);
+                yyjson_doc_free(doc);
+
+                std::string target_to_replace = "\"" + full_match_str + "\"";
+                size_t pos = resolved_json.find(target_to_replace);
+                if (pos == std::string::npos) {
+                    target_to_replace = full_match_str;
+                    pos = resolved_json.find(target_to_replace);
+                }
+
+                if (pos != std::string::npos) {
+                    resolved_json.replace(pos, target_to_replace.length(), value_json);
+                } else {
+                    spdlog::warn("Could not find the reference string '{}' for replacement.", full_match_str);
                 }
             }
-            else
-            {
-                spdlog::debug("Found quoted reference, will replace it.");
-            }
 
-            if (pos != std::string::npos)
-            {
-                resolved_json.replace(pos, target_to_replace.length(), member_json);
-                spdlog::debug("Replacement complete.");
+            if (!found_ref) {
+                break;
             }
-            else
-            {
-                spdlog::warn("Could not find the reference string '{}' (with or without quotes) for replacement.", full_match_str);
-            }
-
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-            // ▲▲▲ ここまでが修正箇所 ▲▲▲
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         }
 
         const size_t max_display_length = 256;
-        std::string resolved_json_for_display = resolved_json; // 表示用の文字列を準備
+        std::string resolved_json_for_display = resolved_json;
 
-        // もし元の文字列が256文字より長ければ
         if (resolved_json.size() > max_display_length)
         {
-            // 表示用文字列を256文字で切り取り、末尾に "..." を追加
             resolved_json_for_display = resolved_json.substr(0,max_display_length) + "...";
-
             spdlog::debug("json trancated {} to {}", resolved_json.size(), resolved_json_for_display.size());
         }
 
@@ -465,3 +482,39 @@ namespace MITSU_Domoe
     }
 
 } // namespace MITSU_Domoe
+
+
+uint64_t MITSU_Domoe::CommandProcessor::load_parameters_from_file(const std::filesystem::path& file_path) {
+    if (!std::filesystem::exists(file_path)) {
+        spdlog::error("Parameter file not found: {}", file_path.string());
+        return 0; // Or throw an exception
+    }
+
+    std::ifstream ifs(file_path);
+    if (!ifs.is_open()) {
+        spdlog::error("Failed to open parameter file: {}", file_path.string());
+        return 0;
+    }
+
+    std::string json_content((std::istreambuf_iterator<char>(ifs)),
+                             std::istreambuf_iterator<char>());
+
+    // We can parse the json to make sure it's valid.
+    const auto parsed = rfl::json::read<rfl::Generic>(json_content);
+    if (!parsed) {
+        spdlog::error("Failed to parse parameter file: {}", file_path.string());
+        return 0;
+    }
+
+    SuccessResult result_capsule;
+    result_capsule.command_name = file_path.filename().string();
+    result_capsule.output_json = json_content;
+    result_capsule.output_raw = *parsed; // Store the parsed object
+
+    const auto new_id = next_command_id_++;
+    result_repo_->store_result(new_id, result_capsule);
+
+    spdlog::info("Loaded parameters from '{}' with ID {}", file_path.string(), new_id);
+
+    return new_id;
+}

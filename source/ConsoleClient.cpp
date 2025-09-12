@@ -12,6 +12,7 @@
 #include "GenerateCentroidsCartridge.hpp"
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
+#include "SubdividePolygonCartridge.hpp"
 
 namespace
 {
@@ -45,6 +46,7 @@ ConsoleClient::ConsoleClient(const std::filesystem::path& log_path) : BaseClient
     processor->register_cartridge(GenerateCentroidsCartridge{});
     processor->register_cartridge(BIGprocess_mock_cartridge{});
     processor->register_cartridge(Need_many_arg_mock_cartridge{});
+    processor->register_cartridge(SubdividePolygonCartridge{});
 }
 
 void ConsoleClient::run()
@@ -120,6 +122,18 @@ void ConsoleClient::run_tests() {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     print_result(read_stl_id, get_result(read_stl_id));
     print_result(generate_centroids_id, get_result(generate_centroids_id));
+
+    spdlog::info("\n--- Test Case: Subdivide Polygon ---");
+    const std::string read_stl_input_3 = R"({"filepath": "sample/resource/tetra.stl"})";
+    uint64_t read_stl_id_3 = post_command("readStl", read_stl_input_3);
+    const std::string subdivide_input =
+        R"({"input_polygon_mesh": "$ref:cmd[)" + std::to_string(read_stl_id_3) + R"(].polygon_mesh", "r": 0.2})";
+    uint64_t subdivide_id = post_command("subdividePolygon", subdivide_input);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    print_result(read_stl_id_3, get_result(read_stl_id_3));
+    print_result(subdivide_id, get_result(subdivide_id));
+
 
     spdlog::info("\n--- Test Case: Chaining commands with $ref (Type Mismatch) ---");
     const std::string read_stl_input_2 = R"({"filepath": "sample/resource/tetra.stl"})";

@@ -16,14 +16,14 @@ class ReadStlCartridge
 public:
     struct Input
     {
-        std::string filepath;
+        rfl::Field<"filepath", std::string> filepath;
     };
 
     struct Output
     {
-        MITSU_Domoe::Polygon_mesh polygon_mesh;
-        std::string filepath;
-        std::string message;
+        rfl::Field<"polygon_mesh", MITSU_Domoe::Polygon_mesh> polygon_mesh;
+        rfl::Field<"filepath", std::string> filepath;
+        rfl::Field<"message", std::string> message;
     };
 
     static inline const std::string command_name = "readStl";
@@ -32,23 +32,24 @@ public:
     Output execute(const Input &input) const
     {
 
-        std::ifstream ifs(input.filepath);
+        std::ifstream ifs(input.filepath.get());
         Eigen::MatrixXd V;
         Eigen::MatrixXi F;
         Eigen::MatrixXd N; // Normals, not used for now
         if (!igl::readSTL(ifs, V, F, N))
         {
             return Output{
-                .message = "Failed to read STL file: " + input.filepath};
+                .polygon_mesh = MITSU_Domoe::Polygon_mesh(),
+                .filepath = input.filepath.get(),
+                .message = "Failed to read STL file: " + input.filepath.get()
+            };
         }
 
-        Output output;
-        output.polygon_mesh.V = std::move(V);
-        output.polygon_mesh.F = std::move(F);
-        output.polygon_mesh.N = std::move(N);
-        output.filepath=input.filepath;
-        output.message = "Successfully read STL file: " + input.filepath;
-        return output;
+        return Output{
+            .polygon_mesh = {{V, F, N}},
+            .filepath = input.filepath.get(),
+            .message = "Successfully read STL file: " + input.filepath.get()
+        };
     }
 };
 

@@ -13,13 +13,13 @@ class GenerateCentroidsCartridge
 public:
     struct Input
     {
-        MITSU_Domoe::Polygon_mesh input_polygon_mesh;
+        rfl::Field<"input_polygon_mesh", MITSU_Domoe::Polygon_mesh> input_polygon_mesh;
     };
 
     struct Output
     {
-        Eigen::MatrixXd centroids;
-        std::string message;
+        rfl::Field<"centroids", Eigen::MatrixXd> centroids;
+        rfl::Field<"message", std::string> message;
     };
 
     static inline const std::string command_name = "generateCentroids";
@@ -27,12 +27,10 @@ public:
 
     Output execute(const Input &input) const
     {
-        // Use the .value() method to get the value from rfl::Field
-        const auto& V = input.input_polygon_mesh.V;
-        const auto& F = input.input_polygon_mesh.F;
+        const auto& V = input.input_polygon_mesh.get().V;
+        const auto& F = input.input_polygon_mesh.get().F;
 
         if (F.rows() == 0) {
-            // Initialize all fields in the Output struct
             return Output{
                 .centroids = Eigen::MatrixXd(),
                 .message = "Input mesh has no faces."

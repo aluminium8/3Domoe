@@ -37,7 +37,7 @@ namespace MITSU_Domoe
 
     CommandProcessor::CommandProcessor(std::shared_ptr<ResultRepository> repo, const std::filesystem::path &log_path)
         : result_repo_(std::move(repo)), log_path_(log_path) {
-            command_history_path_ = log_path_.parent_path() / "command_history";
+            command_history_path_ = log_path_ / "command_history";
             try {
                 if (!std::filesystem::exists(command_history_path_)) {
                     std::filesystem::create_directories(command_history_path_);
@@ -316,7 +316,7 @@ namespace MITSU_Domoe
                 try
                 {
 
-                    const std::string resolved_input_json = this->resolve_refs(input_json, command_name);
+                    const std::string resolved_input_json = this->resolve_refs(input_json, command_name,id);
                     CommandResult result = handler(resolved_input_json);
                     if(auto* success = std::get_if<SuccessResult>(&result)) {
                         success->unresolved_input_json = input_json;

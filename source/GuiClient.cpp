@@ -37,7 +37,7 @@ namespace
 namespace MITSU_Domoe
 {
 
-    GuiClient::GuiClient(const std::filesystem::path& log_path) : BaseClient(log_path)
+    GuiClient::GuiClient(const std::filesystem::path &log_path) : BaseClient(log_path)
     {
         processor->register_cartridge(ReadStlCartridge{});
         processor->register_cartridge(GenerateCentroidsCartridge_mock{});
@@ -47,61 +47,69 @@ namespace MITSU_Domoe
         processor->register_cartridge(CutMeshCartridge{});
     }
 
-void GuiClient::process_mesh_results() {
-  auto results = get_all_results();
-  for (const auto &pair : results) {
-    uint64_t id = pair.first;
-    const auto &result = pair.second;
+    void GuiClient::process_mesh_results()
+    {
+        auto results = get_all_results();
+        for (const auto &pair : results)
+        {
+            uint64_t id = pair.first;
+            const auto &result = pair.second;
 
-    if (const auto *success =
-            std::get_if<MITSU_Domoe::SuccessResult>(&result)) {
-      for (const auto &output_pair : success->output_schema) {
-        const std::string &output_name = output_pair.first;
-        const std::string &output_type = output_pair.second;
+            if (const auto *success =
+                    std::get_if<MITSU_Domoe::SuccessResult>(&result))
+            {
+                for (const auto &output_pair : success->output_schema)
+                {
+                    const std::string &output_name = output_pair.first;
+                    const std::string &output_type = output_pair.second;
 
-        auto mesh_key = std::make_pair(id, output_name);
-        if (mesh_render_states.count(mesh_key)) {
-            continue; // already processed
+                    auto mesh_key = std::make_pair(id, output_name);
+                    if (mesh_render_states.count(mesh_key))
+                    {
+                        continue; // already processed
+                    }
+
+                    if (output_type.find("Polygon_mesh") != std::string::npos)
+                    {
+                        yyjson_doc *doc = yyjson_read(success->output_json.c_str(),
+                                                      success->output_json.length(), 0);
+                        yyjson_val *root = yyjson_doc_get_root(doc);
+                        yyjson_val *mesh_val = yyjson_obj_get(root, output_name.c_str());
+                        if (!mesh_val)
+                        {
+                            yyjson_doc_free(doc);
+                            continue;
+                        }
+                        const char *mesh_json = yyjson_val_write(mesh_val, 0, NULL);
+
+                        auto mesh_obj =
+                            rfl::json::read<MITSU_Domoe::Polygon_mesh>(mesh_json);
+
+                        free((void *)mesh_json);
+                        yyjson_doc_free(doc);
+
+                        if (mesh_obj)
+                        {
+                            const auto &mesh = *mesh_obj;
+                            Eigen::Vector3d min_bound = mesh.V.colwise().minCoeff();
+                            Eigen::Vector3d max_bound = mesh.V.colwise().maxCoeff();
+                            Eigen::Vector3d center = (min_bound + max_bound) / 2.0;
+                            double radius = (max_bound - min_bound).norm() / 2.0;
+
+                            MeshRenderState state;
+                            state.renderer = std::make_unique<Renderer>(mesh);
+                            state.camera_target = center.cast<float>();
+                            state.distance = radius * 2.5f;
+                            state.near_clip = 0.01f * radius;
+                            state.far_clip = 1000.0f * radius;
+
+                            mesh_render_states[mesh_key] = std::move(state);
+                        }
+                    }
+                }
+            }
         }
-
-        if (output_type.find("Polygon_mesh") != std::string::npos) {
-          yyjson_doc *doc = yyjson_read(success->output_json.c_str(),
-                                        success->output_json.length(), 0);
-          yyjson_val *root = yyjson_doc_get_root(doc);
-          yyjson_val *mesh_val = yyjson_obj_get(root, output_name.c_str());
-          if (!mesh_val) {
-              yyjson_doc_free(doc);
-              continue;
-          }
-          const char* mesh_json = yyjson_val_write(mesh_val, 0, NULL);
-
-          auto mesh_obj =
-              rfl::json::read<MITSU_Domoe::Polygon_mesh>(mesh_json);
-
-          free((void*)mesh_json);
-          yyjson_doc_free(doc);
-
-          if (mesh_obj) {
-            const auto &mesh = *mesh_obj;
-            Eigen::Vector3d min_bound = mesh.V.colwise().minCoeff();
-            Eigen::Vector3d max_bound = mesh.V.colwise().maxCoeff();
-            Eigen::Vector3d center = (min_bound + max_bound) / 2.0;
-            double radius = (max_bound - min_bound).norm() / 2.0;
-
-            MeshRenderState state;
-            state.renderer = std::make_unique<Renderer>(mesh);
-            state.camera_target = center.cast<float>();
-            state.distance = radius * 2.5f;
-            state.near_clip = 0.01f * radius;
-            state.far_clip = 1000.0f * radius;
-
-            mesh_render_states[mesh_key] = std::move(state);
-          }
-        }
-      }
     }
-  }
-}
 
     void GuiClient::run()
     {
@@ -262,24 +270,27 @@ void GuiClient::process_mesh_results() {
                 ImGui::Separator();
                 ImGui::Text("Log Playback");
                 ImGui::InputText("Log Path", log_path_buffer, sizeof(log_path_buffer));
-                if (ImGui::Button("Load Log")) {
+                if (ImGui::Button("Load Log"))
+                {
                     handle_load(log_path_buffer);
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Trace Log")) {
+                if (ImGui::Button("Trace Log"))
+                {
                     handle_trace(log_path_buffer);
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Trace Command History")) {
+                if (ImGui::Button("Trace Command History"))
+                {
                     handle_trace_history(log_path_buffer);
                 }
 
-                if (!loaded_log_content.empty()) {
+                if (!loaded_log_content.empty())
+                {
                     ImGui::Separator();
                     ImGui::Text("Loaded Log Content:");
                     ImGui::InputTextMultiline("##loaded_log", &loaded_log_content[0], loaded_log_content.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 16), ImGuiInputTextFlags_ReadOnly);
                 }
-
 
                 ImGui::End();
             }
@@ -329,11 +340,6 @@ void GuiClient::process_mesh_results() {
                 ImGui::Text("Result:");
                 if (selected_result_id != 0)
                 {
-                    ImGui::Text("Unresolved Input:");
-                    ImGui::InputTextMultiline("##unresolved_input", &unresolved_input_for_display[0], unresolved_input_for_display.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_ReadOnly);
-                    ImGui::Text("Resolved Input:");
-                    ImGui::InputTextMultiline("##resolved_input", &resolved_input_for_display[0], resolved_input_for_display.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_ReadOnly);
-                    ImGui::Separator();
 
                     if (result_schema.empty())
                     {
@@ -401,13 +407,16 @@ void GuiClient::process_mesh_results() {
                                     }
                                 }
                                 // Render controls for each mesh
-                                for (const auto &schema_pair : result_schema) {
+                                for (const auto &schema_pair : result_schema)
+                                {
                                     const std::string &output_name = schema_pair.first;
                                     const std::string &output_type = schema_pair.second;
 
-                                    if (output_type.find("Polygon_mesh") != std::string::npos) {
+                                    if (output_type.find("Polygon_mesh") != std::string::npos)
+                                    {
                                         auto mesh_key = std::make_pair(selected_result_id, output_name);
-                                        if (mesh_render_states.count(mesh_key)) {
+                                        if (mesh_render_states.count(mesh_key))
+                                        {
                                             ImGui::TableNextRow();
                                             ImGui::TableSetColumnIndex(0);
                                             ImGui::Text("Render: %s", output_name.c_str());
@@ -420,18 +429,22 @@ void GuiClient::process_mesh_results() {
 
                                             std::string shader_names_str;
                                             std::vector<std::string> shader_names_vec;
-                                            for (const auto &pair : shader_manager.Shaders) {
+                                            for (const auto &pair : shader_manager.Shaders)
+                                            {
                                                 shader_names_str += pair.first + '\0';
                                                 shader_names_vec.push_back(pair.first);
                                             }
                                             int current_shader_idx = -1;
-                                            for (int i = 0; i < shader_names_vec.size(); ++i) {
-                                                if (shader_names_vec[i] == state.selected_shader_name) {
+                                            for (int i = 0; i < shader_names_vec.size(); ++i)
+                                            {
+                                                if (shader_names_vec[i] == state.selected_shader_name)
+                                                {
                                                     current_shader_idx = i;
                                                     break;
                                                 }
                                             }
-                                            if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str())) {
+                                            if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str()))
+                                            {
                                                 state.selected_shader_name = shader_names_vec[current_shader_idx];
                                             }
                                             ImGui::PopID();
@@ -443,6 +456,12 @@ void GuiClient::process_mesh_results() {
                         }
                         yyjson_doc_free(doc);
                     }
+
+                    ImGui::Separator();
+                    ImGui::Text("Unresolved Input:");
+                    ImGui::InputTextMultiline("##unresolved_input", &unresolved_input_for_display[0], unresolved_input_for_display.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_ReadOnly);
+                    ImGui::Text("Resolved Input:");
+                    ImGui::InputTextMultiline("##resolved_input", &resolved_input_for_display[0], resolved_input_for_display.size(), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_ReadOnly);
                 }
                 ImGui::EndChild();
                 if (ImGui::BeginPopup("CopiedPopup"))
@@ -469,9 +488,11 @@ void GuiClient::process_mesh_results() {
             float far = 100.0f;
 
             // Find the first mesh associated with the selected result to control the camera
-            MITSU_Domoe::MeshRenderState* camera_target_state = nullptr;
-            for(auto& [key, state] : mesh_render_states) {
-                if (key.first == selected_result_id) {
+            MITSU_Domoe::MeshRenderState *camera_target_state = nullptr;
+            for (auto &[key, state] : mesh_render_states)
+            {
+                if (key.first == selected_result_id)
+                {
                     camera_target_state = &state;
                     break;
                 }
@@ -572,17 +593,21 @@ void GuiClient::process_mesh_results() {
         glfwTerminate();
     }
 
-    void GuiClient::handle_load(const std::string& path_str) {
+    void GuiClient::handle_load(const std::string &path_str)
+    {
         const std::filesystem::path path(path_str);
         loaded_log_content.clear();
 
-        auto process_file = [this](const std::filesystem::path& file_path) {
-            if (file_path.extension() != ".json") {
+        auto process_file = [this](const std::filesystem::path &file_path)
+        {
+            if (file_path.extension() != ".json")
+            {
                 return;
             }
             spdlog::info("GUI: Loading log: {}", file_path.string());
             std::ifstream ifs(file_path);
-            if (!ifs) {
+            if (!ifs)
+            {
                 spdlog::error("Failed to open file: {}", file_path.string());
                 return;
             }
@@ -591,137 +616,178 @@ void GuiClient::process_mesh_results() {
             // Store the result from the log in the repository
             this->load_result(content);
 
-            try {
+            try
+            {
                 auto parsed = rfl::json::read<rfl::Generic>(content);
-                if (!parsed) {
+                if (!parsed)
+                {
                     throw std::runtime_error(parsed.error().what());
                 }
                 const auto pretty_json = rfl::json::write(*parsed, YYJSON_WRITE_PRETTY);
                 loaded_log_content += "--- " + file_path.filename().string() + " ---\n";
                 loaded_log_content += pretty_json;
                 loaded_log_content += "\n\n";
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 spdlog::error("Failed to parse or print JSON from {}: {}", file_path.string(), e.what());
             }
         };
 
-        if (std::filesystem::is_directory(path)) {
-            for (const auto& entry : std::filesystem::directory_iterator(path)) {
-                if (entry.is_regular_file()) {
+        if (std::filesystem::is_directory(path))
+        {
+            for (const auto &entry : std::filesystem::directory_iterator(path))
+            {
+                if (entry.is_regular_file())
+                {
                     process_file(entry.path());
                 }
             }
-        } else if (std::filesystem::is_regular_file(path)) {
+        }
+        else if (std::filesystem::is_regular_file(path))
+        {
             process_file(path);
-        } else {
+        }
+        else
+        {
             spdlog::error("Path is not a valid file or directory: {}", path_str);
         }
     }
 
-    void GuiClient::handle_trace(const std::string& path_str) {
+    void GuiClient::handle_trace(const std::string &path_str)
+    {
         const std::filesystem::path path(path_str);
 
-        auto process_file = [this](const std::filesystem::path& file_path) {
-            if (file_path.extension() != ".json") {
+        auto process_file = [this](const std::filesystem::path &file_path)
+        {
+            if (file_path.extension() != ".json")
+            {
                 return;
             }
             spdlog::info("GUI: Tracing log: {}", file_path.string());
             std::ifstream ifs(file_path);
-            if (!ifs) {
+            if (!ifs)
+            {
                 spdlog::error("Failed to open file: {}", file_path.string());
                 return;
             }
             const std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
-            try {
-                struct Log {
+            try
+            {
+                struct Log
+                {
                     rfl::Field<"command", std::string> command;
                     rfl::Field<"request", rfl::Generic> request;
                 };
 
                 auto parsed = rfl::json::read<Log>(content);
-                if (!parsed) {
+                if (!parsed)
+                {
                     throw std::runtime_error(parsed.error().what());
                 }
 
-                const std::string& command_name = parsed->command();
+                const std::string &command_name = parsed->command();
                 const std::string request_json = rfl::json::write(parsed->request());
 
                 spdlog::info("GUI: Re-posting command '{}' with input: {}", command_name, request_json);
                 this->post_command(command_name, request_json);
-
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 spdlog::error("Failed to parse or trace JSON from {}: {}", file_path.string(), e.what());
             }
         };
 
-        if (std::filesystem::is_directory(path)) {
+        if (std::filesystem::is_directory(path))
+        {
             std::vector<std::filesystem::path> files;
-            for (const auto& entry : std::filesystem::directory_iterator(path)) {
-                if (entry.is_regular_file() && entry.path().extension() == ".json") {
+            for (const auto &entry : std::filesystem::directory_iterator(path))
+            {
+                if (entry.is_regular_file() && entry.path().extension() == ".json")
+                {
                     files.push_back(entry.path());
                 }
             }
             std::sort(files.begin(), files.end());
-            for (const auto& file_path : files) {
+            for (const auto &file_path : files)
+            {
                 process_file(file_path);
             }
-        } else if (std::filesystem::is_regular_file(path)) {
+        }
+        else if (std::filesystem::is_regular_file(path))
+        {
             process_file(path);
-        } else {
+        }
+        else
+        {
             spdlog::error("Path is not a valid file or directory: {}", path_str);
         }
     }
 
-    void GuiClient::handle_trace_history(const std::string& path_str) {
+    void GuiClient::handle_trace_history(const std::string &path_str)
+    {
         const std::filesystem::path path(path_str);
 
-        auto process_file = [this](const std::filesystem::path& file_path) {
-            if (file_path.extension() != ".json") {
+        auto process_file = [this](const std::filesystem::path &file_path)
+        {
+            if (file_path.extension() != ".json")
+            {
                 return;
             }
             spdlog::info("GUI: Tracing command history log: {}", file_path.string());
             std::ifstream ifs(file_path);
-            if (!ifs) {
+            if (!ifs)
+            {
                 spdlog::error("Failed to open file: {}", file_path.string());
                 return;
             }
             const std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
-            try {
-                struct Log {
+            try
+            {
+                struct Log
+                {
                     rfl::Field<"command", std::string> command;
                     rfl::Field<"request", rfl::Generic> request;
                 };
 
                 auto parsed = rfl::json::read<Log>(content);
-                if (!parsed) {
+                if (!parsed)
+                {
                     throw std::runtime_error(parsed.error().what());
                 }
 
-                const std::string& command_name = parsed->command();
+                const std::string &command_name = parsed->command();
                 const std::string request_json = rfl::json::write(parsed->request());
 
                 spdlog::info("GUI: Re-posting command '{}' from history with input: {}", command_name, request_json);
                 this->post_command(command_name, request_json);
-
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 spdlog::error("Failed to parse or trace JSON from {}: {}", file_path.string(), e.what());
             }
         };
 
-        if (std::filesystem::is_directory(path)) {
+        if (std::filesystem::is_directory(path))
+        {
             std::vector<std::filesystem::path> files;
-            for (const auto& entry : std::filesystem::directory_iterator(path)) {
-                if (entry.is_regular_file() && entry.path().extension() == ".json") {
+            for (const auto &entry : std::filesystem::directory_iterator(path))
+            {
+                if (entry.is_regular_file() && entry.path().extension() == ".json")
+                {
                     files.push_back(entry.path());
                 }
             }
             std::sort(files.begin(), files.end());
-            for (const auto& file_path : files) {
+            for (const auto &file_path : files)
+            {
                 process_file(file_path);
             }
-        } else {
+        }
+        else
+        {
             spdlog::error("Path is not a valid directory for tracing history: {}", path_str);
         }
     }

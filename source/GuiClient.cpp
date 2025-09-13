@@ -22,6 +22,8 @@
 #include "Need_many_arg_mock_cartridge.hpp"
 #include "CutMeshCartridge.hpp"
 #include "SubdividePolygonCartridge.hpp"
+#include "LoadJsonCartridge.hpp"
+#include "ReferenceTestCartridge.hpp"
 
 
 #include <rfl.hpp>
@@ -48,6 +50,8 @@ namespace MITSU_Domoe
         processor->register_cartridge(Need_many_arg_mock_cartridge{});
         processor->register_cartridge(CutMeshCartridge{});
         processor->register_cartridge(SubdividePolygonCartridge{});
+        processor->register_cartridge(LoadJsonCartridge{});
+        processor->register_cartridge(ReferenceTestCartridge{});
         
     }
 

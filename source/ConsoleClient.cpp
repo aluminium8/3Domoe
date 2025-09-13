@@ -13,6 +13,8 @@
 #include "BIGprocess_mock_cartridge.hpp"
 #include "Need_many_arg_mock_cartridge.hpp"
 #include "SubdividePolygonCartridge.hpp"
+#include "LoadJsonCartridge.hpp"
+#include "ReferenceTestCartridge.hpp"
 
 namespace
 {
@@ -47,6 +49,8 @@ ConsoleClient::ConsoleClient(const std::filesystem::path& log_path) : BaseClient
     processor->register_cartridge(BIGprocess_mock_cartridge{});
     processor->register_cartridge(Need_many_arg_mock_cartridge{});
     processor->register_cartridge(SubdividePolygonCartridge{});
+    processor->register_cartridge(LoadJsonCartridge{});
+    processor->register_cartridge(ReferenceTestCartridge{});
 }
 
 void ConsoleClient::run()
@@ -89,6 +93,25 @@ void ConsoleClient::run()
             } else {
                 handle_trace(path);
             }
+        } else if (command == "exec") {
+            std::string cartridge_name;
+            ss >> cartridge_name;
+            std::string input_json;
+            std::getline(ss, input_json);
+
+            // Trim leading whitespace from json
+            input_json.erase(input_json.begin(), std::find_if(input_json.begin(), input_json.end(), [](unsigned char ch) {
+                return !std::isspace(ch);
+            }));
+
+            if (cartridge_name.empty() || input_json.empty()) {
+                spdlog::error("Usage: exec <cartridge_name> <json_input>");
+                continue;
+            }
+            uint64_t id = post_command(cartridge_name, input_json);
+            std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Give time for the command to be processed
+            print_result(id, get_result(id));
+
         } else if (command.empty()) {
             // do nothing
         }

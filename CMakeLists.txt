@@ -99,6 +99,11 @@ add_executable(CLImain ./sample/CLImain.cpp)
 target_link_libraries(CLImain PRIVATE ClientLib)
 target_include_directories(CLImain PRIVATE include)
 
+# Add the test executable for demonstrating parameter loading
+add_executable(RefTest sample/ref_test_main.cpp)
+target_link_libraries(RefTest PRIVATE ClientLib)
+target_include_directories(RefTest PRIVATE include)
+
 
 
 #TODO old files must be deleted

@@ -299,13 +299,43 @@ namespace MITSU_Domoe
         log_unresolved_command(id, command_name, input_json, command_history_path_);
         std::function<CommandResult()> task_logic;
 
-        if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end())
+        if (command_name == "load_params")
+        {
+            task_logic = [this, input_json, command_name, id]() -> CommandResult
+            {
+                struct LoadParamsInput
+                {
+                    rfl::Field<"file_path", std::string> file_path;
+                };
+                auto input = rfl::json::read<LoadParamsInput>(input_json);
+                if (!input)
+                {
+                    return ErrorResult{"Invalid input for load_params: " + input.error().what()};
+                }
+
+                std::ifstream file(input->file_path());
+                if (!file.is_open())
+                {
+                    return ErrorResult{"Failed to open parameter file: " + input->file_path()};
+                }
+
+                std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+                SuccessResult result;
+                result.command_name = command_name;
+                result.output_json = content;
+                result.unresolved_input_json = input_json;
+                result.resolved_input_json = input_json; // No refs to resolve in the input for this command.
+                // schema can be empty for this special command
+                return result;
+            };
+        }
+        else if (auto it = cartridge_manager.find(command_name); it != cartridge_manager.end())
         {
             task_logic = [this, handler = it->second.handler, input_json, command_name, id]
             {
                 try
                 {
-
                     const std::string resolved_input_json = this->resolve_refs(input_json, command_name, id);
                     CommandResult result = handler(resolved_input_json);
                     if (auto *success = std::get_if<SuccessResult>(&result))

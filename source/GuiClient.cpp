@@ -27,6 +27,7 @@
 #include <rfl.hpp>
 #include <rfl_eigen_serdes.hpp>
 #include <fstream>
+#include <igl/file_dialog_open.h>
 
 namespace
 {
@@ -287,6 +288,32 @@ namespace MITSU_Domoe
                 if (ImGui::Button("Trace Command History"))
                 {
                     handle_trace_history(log_path_buffer);
+                }
+
+                ImGui::Separator();
+                ImGui::Text("Parameter Loading");
+                if (ImGui::Button("Load Parameter File"))
+                {
+                    const std::string file_path = igl::file_dialog_open();
+                    if (!file_path.empty()) {
+                        spdlog::info("File selected for parameter loading: {}", file_path);
+
+                        // Escape backslashes for JSON compatibility
+                        std::string escaped_path = file_path;
+                        size_t pos = 0;
+                        while ((pos = escaped_path.find('\\', pos)) != std::string::npos) {
+                            escaped_path.replace(pos, 1, "\\\\");
+                            pos += 2;
+                        }
+
+                        std::string input_json = "{\"file_path\": \"" + escaped_path + "\"}";
+
+                        post_command("load_params", input_json);
+                        spdlog::info("Posted 'load_params' command with input: {}", input_json);
+
+                    } else {
+                        spdlog::info("File selection cancelled.");
+                    }
                 }
 
                 if (!loaded_log_content.empty())

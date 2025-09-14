@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <utility>
 
+struct yyjson_val;
 
 namespace MITSU_Domoe {
 
@@ -38,6 +39,7 @@ public:
     void run() override;
 
 private:
+    void render_json_tree_node(yyjson_val *node, const std::string &current_path, uint64_t result_id);
     void process_mesh_results();
     void handle_load(const std::string& path_str);
     void handle_trace(const std::string& path_str);

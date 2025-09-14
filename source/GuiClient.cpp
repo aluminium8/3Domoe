@@ -22,7 +22,7 @@
 #include "Need_many_arg_mock_cartridge.hpp"
 #include "CutMeshCartridge.hpp"
 #include "SubdividePolygonCartridge.hpp"
-
+#include "LoadJsonCartridge.hpp"
 
 #include <rfl.hpp>
 #include <rfl_eigen_serdes.hpp>
@@ -49,12 +49,14 @@ namespace MITSU_Domoe
         // Extract the last part of the path for the label
         std::string label = current_path;
         size_t last_dot = current_path.find_last_of('.');
-        if (last_dot != std::string::npos) {
+        if (last_dot != std::string::npos)
+        {
             label = current_path.substr(last_dot + 1);
         }
 
         // Handle root case
-        if (current_path.empty()) {
+        if (current_path.empty())
+        {
             label = "root";
         }
 
@@ -67,7 +69,7 @@ namespace MITSU_Domoe
             ImGui::SameLine();
             if (ImGui::Button("Ref"))
             {
-                std::string ref_syntax = "$ref:cmd[" + std::to_string(result_id) + "]" + (current_path.empty() ? "" : ".") + current_path;
+                std::string ref_syntax = "\"$ref:cmd[" + std::to_string(result_id) + "]" + (current_path.empty() ? "" : ".") + current_path + "\"";
                 ImGui::SetClipboardText(ref_syntax.c_str());
                 ImGui::OpenPopup("CopiedPopup");
             }
@@ -114,7 +116,7 @@ namespace MITSU_Domoe
             ImGui::SameLine();
             if (ImGui::Button("Ref"))
             {
-                std::string ref_syntax = "$ref:cmd[" + std::to_string(result_id) + "]" + (current_path.empty() ? "" : ".") + current_path;
+               std::string ref_syntax = "\"$ref:cmd[" + std::to_string(result_id) + "]" + (current_path.empty() ? "" : ".") + current_path + "\"";
                 ImGui::SetClipboardText(ref_syntax.c_str());
                 ImGui::OpenPopup("CopiedPopup");
             }
@@ -132,7 +134,7 @@ namespace MITSU_Domoe
         processor->register_cartridge(Need_many_arg_mock_cartridge{});
         processor->register_cartridge(CutMeshCartridge{});
         processor->register_cartridge(SubdividePolygonCartridge{});
-        
+        processor->register_cartridge(LoadJsonCartridge{});
     }
 
     void GuiClient::process_mesh_results()

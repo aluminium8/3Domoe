@@ -158,7 +158,7 @@ namespace MITSU_Domoe
     {
         spdlog::debug("Starting reference resolution for command {}: {}", current_cmd_id, input_json);
 
-        const std::regex ref_regex(R"(\$ref:(?:cmd\[(\d+)\]|(latest)|prev\[(\d+)\])\.(\w+))");
+        const std::regex ref_regex(R"(\$ref:(?:cmd\[(\d+)\]|(latest)|prev\[(\d+)\])\.([\w\.]+))");
 
         struct Replacement
         {
@@ -244,13 +244,15 @@ namespace MITSU_Domoe
                 throw std::runtime_error("Output of command ID " + std::to_string(cmd_id) + " is not a JSON object.");
             }
 
-            yyjson_val *member_val = yyjson_obj_get(root, member_name.c_str());
+            // 修正後: JSON Pointerを使ってネストした値を取得
+            std::string json_pointer_path = "/" + std::regex_replace(member_name, std::regex(R"(\.)"), "/");
+            yyjson_val *member_val = yyjson_get_pointer(root, json_pointer_path.c_str());
             if (!member_val)
             {
                 yyjson_doc_free(doc);
-                throw std::runtime_error("Member '" + member_name + "' not found in output of command ID " + std::to_string(cmd_id));
+                // エラーメッセージをより分かりやすくする
+                throw std::runtime_error("Member path '" + member_name + "' (JSON Pointer: '" + json_pointer_path + "') not found in output of command ID " + std::to_string(cmd_id));
             }
-
             const char *member_json_c_str = yyjson_val_write(member_val, 0, NULL);
             if (!member_json_c_str)
             {

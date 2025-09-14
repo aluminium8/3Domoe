@@ -1,0 +1,11 @@
+{
+  "parameters": {
+    "string_param": "hello_world",
+    "number_param": 123.456,
+    "nested_object": {
+      "bool_param": true,
+      "array_param": [1, 2, 3]
+    }
+  },
+  "is_test": true
+}

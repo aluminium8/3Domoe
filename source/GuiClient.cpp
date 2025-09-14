@@ -38,90 +38,6 @@ namespace
 
 namespace MITSU_Domoe
 {
-    void GuiClient::render_json_tree_node(yyjson_val *node, const std::string &current_path, uint64_t result_id)
-    {
-        if (!node)
-            return;
-
-        // For each node, we create a line with a Ref button, the node's name (or index), and its value or a collapsible tree.
-        ImGui::PushID(current_path.c_str());
-
-        // Extract the last part of the path for the label
-        std::string label = current_path;
-        size_t last_dot = current_path.find_last_of('.');
-        if (last_dot != std::string::npos) {
-            label = current_path.substr(last_dot + 1);
-        }
-
-        // Handle root case
-        if (current_path.empty()) {
-            label = "root";
-        }
-
-        bool is_container = yyjson_is_obj(node) || yyjson_is_arr(node);
-
-        // For containers, we make the node collapsible. For primitives, we just display the value.
-        if (is_container)
-        {
-            bool tree_node_open = ImGui::TreeNode(label.c_str());
-            ImGui::SameLine();
-            if (ImGui::Button("Ref"))
-            {
-                std::string ref_syntax = "$ref:cmd[" + std::to_string(result_id) + "]" + (current_path.empty() ? "" : ".") + current_path;
-                ImGui::SetClipboardText(ref_syntax.c_str());
-                ImGui::OpenPopup("CopiedPopup");
-            }
-
-            if (tree_node_open)
-            {
-                if (yyjson_is_obj(node))
-                {
-                    yyjson_obj_iter iter;
-                    yyjson_obj_iter_init(node, &iter);
-                    yyjson_val *key, *val;
-                    while ((key = yyjson_obj_iter_next(&iter)))
-                    {
-                        val = yyjson_obj_iter_get_val(key);
-                        const char *key_str = yyjson_get_str(key);
-                        std::string new_path = current_path.empty() ? key_str : current_path + "." + key_str;
-                        render_json_tree_node(val, new_path, result_id);
-                    }
-                }
-                else
-                { // is_arr
-                    size_t idx, max;
-                    yyjson_val *val;
-                    yyjson_arr_foreach(node, idx, max, val)
-                    {
-                        std::string new_path = current_path + "[" + std::to_string(idx) + "]";
-                        render_json_tree_node(val, new_path, result_id);
-                    }
-                }
-                ImGui::TreePop();
-            }
-        }
-        else
-        {
-            // For primitive types, display label, value and Ref button on one line.
-            ImGui::Bullet();
-            ImGui::TextUnformatted(label.c_str());
-            ImGui::SameLine();
-
-            const char *value_str = yyjson_val_write(node, 0, NULL);
-            ImGui::TextDisabled("%s", value_str);
-            free((void *)value_str);
-
-            ImGui::SameLine();
-            if (ImGui::Button("Ref"))
-            {
-                std::string ref_syntax = "$ref:cmd[" + std::to_string(result_id) + "]" + (current_path.empty() ? "" : ".") + current_path;
-                ImGui::SetClipboardText(ref_syntax.c_str());
-                ImGui::OpenPopup("CopiedPopup");
-            }
-        }
-
-        ImGui::PopID();
-    }
 
     GuiClient::GuiClient(const std::filesystem::path &log_path) : BaseClient(log_path)
     {
@@ -440,49 +356,106 @@ namespace MITSU_Domoe
 
                         if (root)
                         {
-                            render_json_tree_node(root, "", selected_result_id);
-
-                            // Render controls for each mesh
-                            ImGui::Separator();
-                            ImGui::Text("Render Controls");
-                            for (const auto &schema_pair : result_schema)
+                            if (ImGui::BeginTable("result_table", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
                             {
-                                const std::string &output_name = schema_pair.first;
-                                const std::string &output_type = schema_pair.second;
+                                ImGui::TableSetupColumn("Field");
+                                ImGui::TableSetupColumn("Value");
+                                ImGui::TableSetupColumn("Reference", ImGuiTableColumnFlags_WidthFixed);
+                                ImGui::TableHeadersRow();
 
-                                if (output_type.find("Polygon_mesh") != std::string::npos)
+                                for (const auto &pair : result_schema)
                                 {
-                                    auto mesh_key = std::make_pair(selected_result_id, output_name);
-                                    if (mesh_render_states.count(mesh_key))
+                                    const std::string &name = pair.first;
+                                    const std::string &type = pair.second;
+                                    yyjson_val *value_val = yyjson_obj_get(root, name.c_str());
+                                    if (value_val)
                                     {
-                                        auto &state = mesh_render_states.at(mesh_key);
-                                        ImGui::PushID(output_name.c_str());
-                                        ImGui::Text("Mesh: %s", output_name.c_str());
-                                        ImGui::Checkbox("Visible", &state.is_visible);
+                                        const char *value_str = yyjson_val_write(value_val, 0, NULL);
+                                        if (value_str)
+                                        {
+                                            ImGui::TableNextRow();
+                                            ImGui::TableSetColumnIndex(0);
+                                            ImGui::TextUnformatted((name + "\n [" + type + "]").c_str());
+                                            ImGui::TableSetColumnIndex(1);
+                                            ImGui::PushID(name.c_str());
 
-                                        std::string shader_names_str;
-                                        std::vector<std::string> shader_names_vec;
-                                        for (const auto &pair : shader_manager.Shaders)
-                                        {
-                                            shader_names_str += pair.first + '\0';
-                                            shader_names_vec.push_back(pair.first);
-                                        }
-                                        int current_shader_idx = -1;
-                                        for (int i = 0; i < shader_names_vec.size(); ++i)
-                                        {
-                                            if (shader_names_vec[i] == state.selected_shader_name)
+                                            const size_t max_display_length = 256;
+                                            std::string display_str = value_str; // 表示用の文字列を準備
+
+                                            // もし元の文字列が256文字より長ければ
+                                            if (strlen(value_str) > max_display_length)
                                             {
-                                                current_shader_idx = i;
-                                                break;
+                                                // 表示用文字列を256文字で切り取り、末尾に "..." を追加
+                                                display_str = std::string(value_str, max_display_length) + "...";
                                             }
+
+                                            // 加工した表示用文字列を描画
+                                            ImGui::TextWrapped("%s", display_str.c_str());
+
+                                            if (ImGui::IsItemClicked())
+                                            {
+                                                ImGui::SetClipboardText(value_str);
+                                                ImGui::OpenPopup("CopiedPopup");
+                                            }
+                                            ImGui::PopID();
+                                            ImGui::TableSetColumnIndex(2);
+                                            std::string button_label = "Ref##" + name;
+                                            if (ImGui::Button(button_label.c_str()))
+                                            {
+                                                std::string ref_syntax = "$ref:cmd[" + std::to_string(selected_result_id) + "]." + name;
+                                                ImGui::SetClipboardText(ref_syntax.c_str());
+                                                ImGui::OpenPopup("CopiedPopup");
+                                            }
+                                            free((void *)value_str);
                                         }
-                                        if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str()))
-                                        {
-                                            state.selected_shader_name = shader_names_vec[current_shader_idx];
-                                        }
-                                        ImGui::PopID();
                                     }
                                 }
+                                // Render controls for each mesh
+                                for (const auto &schema_pair : result_schema)
+                                {
+                                    const std::string &output_name = schema_pair.first;
+                                    const std::string &output_type = schema_pair.second;
+
+                                    if (output_type.find("Polygon_mesh") != std::string::npos)
+                                    {
+                                        auto mesh_key = std::make_pair(selected_result_id, output_name);
+                                        if (mesh_render_states.count(mesh_key))
+                                        {
+                                            ImGui::TableNextRow();
+                                            ImGui::TableSetColumnIndex(0);
+                                            ImGui::Text("Render: %s", output_name.c_str());
+                                            ImGui::TableSetColumnIndex(1);
+
+                                            auto &state = mesh_render_states.at(mesh_key);
+
+                                            ImGui::PushID(output_name.c_str());
+                                            ImGui::Checkbox("Visible", &state.is_visible);
+
+                                            std::string shader_names_str;
+                                            std::vector<std::string> shader_names_vec;
+                                            for (const auto &pair : shader_manager.Shaders)
+                                            {
+                                                shader_names_str += pair.first + '\0';
+                                                shader_names_vec.push_back(pair.first);
+                                            }
+                                            int current_shader_idx = -1;
+                                            for (int i = 0; i < shader_names_vec.size(); ++i)
+                                            {
+                                                if (shader_names_vec[i] == state.selected_shader_name)
+                                                {
+                                                    current_shader_idx = i;
+                                                    break;
+                                                }
+                                            }
+                                            if (ImGui::Combo("Shader", &current_shader_idx, shader_names_str.c_str()))
+                                            {
+                                                state.selected_shader_name = shader_names_vec[current_shader_idx];
+                                            }
+                                            ImGui::PopID();
+                                        }
+                                    }
+                                }
+                                ImGui::EndTable();
                             }
                         }
                         yyjson_doc_free(doc);
